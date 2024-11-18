@@ -4,7 +4,7 @@ Created on Mon Nov 18 13:58:25 2024
 
 @author: User
 """
-
+print("marta was here")
 # -*- coding: utf-8 -*-
 """
 Write participation matrix to LaTeX table or Excel
