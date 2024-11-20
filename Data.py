@@ -1,11 +1,17 @@
 import pandas as pd
 #Save this file in your working directory
 
-# Load Generation Data
+# Load Generation Data from investor
 file_path1 = "Generation Data.xlsx"  # you need to have this file in your working directory
-generation_data = pd.read_excel(file_path1)
+investor_generation_data = pd.read_excel(file_path1, sheet_name = "Generation_investor")
 pd.set_option('display.max_rows', None)
-print(generation_data)
+print(investor_generation_data)
+
+#load generation data from rival
+file_path1 = "Generation Data.xlsx"  # you need to have this file in your working directory
+rival_generation_data = pd.read_excel(file_path1, sheet_name = "Generation_rival")
+pd.set_option('display.max_rows', None)
+print(rival_generation_data)
 
 # Lines Generation Data
 file_path2 = "Lines_Data.xlsx"  # you need to have this file in your working directory
