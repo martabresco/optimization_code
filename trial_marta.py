@@ -1,6 +1,7 @@
 import gurobipy as gp
 from gurobipy import GRB
 import pandas as pd
+import math as m
 
 from Data import investor_generation_data
 from Data import rival_generation_data
@@ -11,8 +12,11 @@ from Data import Demand_profile
 from Data import Demand_distribution
 from Data import Demand_prices
 from Data import Investment_data
+from Data import Rival_scenarios
+from Data import Demand_scenarios
 
-
+nodes = list(range(1, 25))
+scenarios=list(range(1,4))
 
 class Expando(object):
     '''
@@ -66,9 +70,7 @@ class InputData: #Idea: create one class for Input variables and one class for t
         investment_cost:dict[str,int],
         max_investment_capacity:dict[str,int]
         
-        
-        
-        
+        #Doubt: do I also need to import demand scenarios and Rival scenarios as an attribute?
         
 
     ):
@@ -80,17 +82,13 @@ class InputData: #Idea: create one class for Input variables and one class for t
         self.existing_investor_generator_capacity = existing_investor_generator_capacity
         # Dictionary with each cost of existing geenrator
         self.existing_investor_generator_cost = existing_investor_generator_cost 
-        
         self.existing_rival_generator_id = existing_rival_generator_id
         #Dictionary with connection node of each existing generator
         self.existing_rival_generator_node = existing_rival_generator_node
         #Dictionary with capacity of each existing generator
         self.existing_rival_generator_capacity = existing_rival_generator_capacity
         # Dictionary with each cost of existing geenrator
-        self.existing_rival_generator_cost = existing_rival_generator_cost 
-        
-        
-        
+        self.existing_rival_generator_cost = existing_rival_generator_cost      
         self.line_id=line_id
         self.line_from=line_from
         self.line_to=line_to
@@ -106,6 +104,399 @@ class InputData: #Idea: create one class for Input variables and one class for t
         self.technology_type=technology_type
         self.investment_cost=investment_cost
         self.max_investment_capacity=max_investment_capacity
+
+
+class Optimal_Investment():
+
+    def __init__(self, input_data: InputData, complementarity_method: str = 'Big M'): # initialize class
+        self.data = input_data # define data attributes
+        self.complementarity_method = complementarity_method # define method for complementarity conditions
+        self.variables = Expando() # define variable attributes
+        self.constraints = Expando() # define constraints attributes
+        self.results = Expando() # define results attributes
+        self._build_model() # build gurobi model
+     
+    def _build_variables(self):
+    # lower-level primal variables
+        self.variables.prod_new_conv_unit = {
+            (w, h, n): self.model.addVar(
+                lb=0,
+                ub=Investment_data.iloc[0, 2],  # Upper bound is taken from Investment_data for this example
+                name=f'Electricity production of candidate  conventional unit  at node {n}, scenario {w} and hour {h}'
+                )
+            for w in self.data.Rival_scenarios  # Assuming you have a list of generators
+            for h in self.data.hour        # Iterating over hours
+            for n in self.data.nodes       # Iterating over nodes
+            }
+        self.variables.prod_PV ={
+            (w, h, n): self.model.addVar(
+                lb=0,
+                ub=Investment_data.iloc[1, 2],  # Upper bound is taken from Investment_data for this example
+                name=f'Electricity production of candidate  PV unit  at node {n}, scenario {w} and hour {h}'
+                )
+            for w in self.data.Rival_scenarios  # Assuming you have a list of generators
+            for h in self.data.hour        # Iterating over hours
+            for n in self.data.nodes       # Iterating over nodes
+            } #production from new pv unit located in n, under scenario w and at time h
+        self.variables.prod_wind ={
+            (w, h, n): self.model.addVar(
+                lb=0,
+                ub=Investment_data.iloc[2, 2],  # Upper bound is taken from Investment_data for this example
+                name=f'Electricity production of candidate  wind unit  at node {n}, scenario {w} and hour {h}'
+                )
+            for w in self.data.Rival_scenarios  # Assuming you have a list of generators
+            for h in self.data.hour        # Iterating over hours
+            for n in self.data.nodes       # Iterating over nodes
+            }
+        self.variables.prod_existing_conv ={
+            (w, h, n,u): self.model.addVar(
+                lb=0, 
+                ub=investor_generation_data.iloc[u-1, 2], #maybe there is an error here
+                name=f'Electricity production of existing conventional investor from unit {u} at node {n}, scenario {w} and hour {h}'
+                )
+            for w in self.data.Rival_scenarios  # Assuming you have a list of generators
+            for h in self.data.hour        # Iterating over hours
+            for n in self.data.nodes       # Iterating over nodes
+            for u in self.data.existing_investor_generator_id
+            }
+        self.variables.prod_existing_rival={
+            (w,h,n,u): self.model.addVar(
+                lb=0,
+                ub=rival_generation_data.iloc[u-1, 2],
+                name = f'Electricity production of existing conventional from rival unit{u}, at node {n}, scenario {w} and hour {h}'
+                )#maybe there is an error here)
+            for w in self.data.Rival_scenarios  # Assuming you have a list of generators
+            for h in self.data.hour        # Iterating over hours
+            for n in self.data.nodes       # Iterating over nodes
+            for u in self.data.existing_rival_generator_id #iterating over units 
+            }
+        self.variables.prod_new_conv_rival={
+            (w,h,n): self.model.addVar(
+                lb=0,
+                ub=Rival_scenarios.iloc[0,w], #maybe this is wrong
+                name = f'Electricity production of new conventional from rival at node {n}, scenario {w} and hour {h}'
+                )#maybe there is an error here)
+            for w in self.data.Rival_scenarios  # Assuming you have a list of generators
+            for h in self.data.hour        # Iterating over hours
+            for n in self.data.nodes       # Iterating over nodes
+            }
+        self.variables.demand_consumed={
+            (w,h,n): self.model.addVar(
+                lb=0,
+                ub=Demand_scenarios.iloc[h,w], #maybe this is wrong
+                name = f'Electricity consumed by demand at node {n}, scenario {w} and hour {h}'
+                )#maybe there is an error here)
+            for w in self.data.Rival_scenarios  # Assuming you have a list of generators
+            for h in self.data.hour        # Iterating over hours
+            for n in self.data.nodes       # Iterating over nodes
+            }
+        self.variables.voltage_angle={
+            (w,h,n): self.model.addVar(
+                lb=-math.pi,
+                ub=math.pi,
+                name = f'Voltage angle at node {n}, scenario {w} and hour {h}'
+                )
+            }
+
+        ## upper-level variables
+        self.variables.cap_invest_conv = {
+            n: self.model.addVar(
+            lb=0,
+            ub=GRB.INFINITY,
+            name = f'Capacity investment in conventionals in node {n}')
+        for n in self.data.nodes       # Iterating over nodes
+        }
+        self.variables.cap_invest_PV = {
+            n: self.model.addVar(
+            lb=0,
+            ub=GRB.INFINITY,
+            name = f'Capacity investment in PV in node {n}')
+        for n in self.data.nodes      # Iterating over nodes
+        }
+        self.variables.cap_Wind = {
+            n: self.model.addVar(
+            lb=0,
+            ub=GRB.INFINITY,
+            name = f'Capacity investment in wind in node {n}')
+        for n in self.data.nodes       # Iterating over nodes
+        }
+        self.variables.conv_invest_bin={
+            n: self.model.addVar(
+                vtype=grb.GRB.BINARY, 
+                name = f'Binary var, 1 if conventional investment in node {n}'
+                )}
+        self.variables.PV_invest_bin={
+            n: self.model.addVar(
+                vtype=grb.GRB.BINARY, 
+                name = f'Binary var, 1 if PV investment in node {n}'
+                )}
+        self.variables.wind_invest_bin={
+            n: self.model.addVar(
+                vtype=grb.GRB.BINARY, 
+                name = f'Binary var, 1 if wind investment in node {n}'
+                )}
+        self.variables.node_bin={
+            n: self.model.addVar(
+                vtype=grb.GRB.BINARY, 
+                name = f'Binary var, 1 if any investment in node {n}'
+                )}
+
+
+    
+    def _build_upper_level_constraint(self):
+        self.constraints.upper_level_max_production_constraint = self.model.addLConstr(
+            self.variables.g1_production_DA,
+            GRB.LESS_EQUAL,
+            self.data.generator_capacity['G1'],
+            name='Upper-level max production constraint for generator G1',
+        )
+
+
+
+
+    def _build_kkt_primal_constraints(self):
+        # build balance constraint
+        # constraints from the 2nd level problem
+    
+    def _build_kkt_first_order_constraints(self):
+        #lagrangian
+        self.constraints.first_order_condition_generator_production = {
+            g: self.model.addLConstr(
+                self.data.generator_cost[g] - self.variables.balance_dual - self.variables.min_production_dual[g] + self.variables.max_production_dual[g],
+                GRB.EQUAL,
+                0,
+                name='1st order condition - wrt to production {0}'.format(g)
+            ) for g in self.data.GENERATORS
+        } 
+        self.constraints.first_order_condition_load_consumption = {
+            d: self.model.addLConstr(
+                - self.data.load_utility[d] + self.variables.balance_dual - self.variables.min_consumption_dual[d] + self.variables.max_consumption_dual[d],
+                GRB.EQUAL,
+                0,
+                name='1st order condition - wrt to consumption {0}'.format(d)
+            ) for d in self.data.LOADS
+        }
+
+    def _build_big_m_complementarity_conditions(self):
+        # create auxiliary variables
+        self.variables.complementarity_min_production_auxiliary = {
+            g: self.model.addVar(
+                vtype=GRB.BINARY, name='Auxiliary variable for complementarity condition on min. production constraint of generator {0}'.format(g)
+            ) for g in self.data.GENERATORS
+        }
+        self.variables.complementarity_max_production_auxiliary = {
+            g: self.model.addVar(
+                vtype=GRB.BINARY, name='Auxiliary variable for complementarity condition on max. production constraint of generator {0}'.format(g)
+            ) for g in self.data.GENERATORS
+        } 
+        self.variables.complementarity_min_consumption_auxiliary = {
+            d: self.model.addVar(
+                vtype=GRB.BINARY, name='Auxiliary variable for complementarity condition on min. consumption constraint of load {0}'.format(d)
+            ) for d in self.data.LOADS
+        } 
+        self.variables.complementarity_max_consumption_auxiliary = {
+            d: self.model.addVar(
+                vtype=GRB.BINARY, name='Auxiliary variable for complementarity condition on max. consumption constraint of load {0}'.format(d)
+            ) for d in self.data.LOADS
+        }
+
+        big_M = 10000
+
+        # complementarity conditions related to production as constraints
+        self.constraints.complementarity_max_production_mu = {
+            g: self.model.addLConstr(
+                self.variables.max_production_dual[g], 
+                GRB.LESS_EQUAL,
+                big_M * self.variables.complementarity_max_production_auxiliary[g]
+            ) for g in self.data.GENERATORS
+        }
+        self.constraints.complementarity_max_production_gx = {
+            g: self.model.addLConstr(
+                self.data.generator_capacity[g] - self.variables.generator_production[g],
+                GRB.LESS_EQUAL,
+                big_M * (1 - self.variables.complementarity_max_production_auxiliary[g]),
+            ) for g in self.data.GENERATORS if g != 'G1'
+        }
+        self.constraints.complementarity_max_production_g1 = self.model.addLConstr(
+            self.variables.g1_production_DA - self.variables.generator_production['G1'],
+            GRB.LESS_EQUAL,
+            big_M * (1 - self.variables.complementarity_max_production_auxiliary['G1']),
+        )
+        self.constraints.complementarity_min_production_mu = {
+            g: self.model.addLConstr(
+                self.variables.min_production_dual[g], 
+                GRB.LESS_EQUAL,
+                big_M * self.variables.complementarity_min_production_auxiliary[g],
+            ) for g in self.data.GENERATORS
+        }
+        self.constraints.complementarity_min_production_gx = {
+            g: self.model.addLConstr(
+                self.variables.generator_production[g],
+                GRB.LESS_EQUAL,
+                big_M * (1 - self.variables.complementarity_min_production_auxiliary[g])
+            ) for g in self.data.GENERATORS
+        }
+
+        # complementarity conditions related to consumption as constraints
+        self.constraints.complementarity_max_consumption_sigma = {
+            d: self.model.addLConstr(
+                self.variables.max_consumption_dual[d], 
+                GRB.LESS_EQUAL,
+                big_M * self.variables.complementarity_max_consumption_auxiliary[d]
+            ) for d in self.data.LOADS
+        }
+        self.constraints.complementarity_max_consumption_lx = {
+            d: self.model.addLConstr(
+                self.data.load_capacity[d] - self.variables.load_consumption[d],
+                GRB.LESS_EQUAL,
+                big_M * (1 - self.variables.complementarity_max_consumption_auxiliary[d])
+            ) for d in self.data.LOADS
+        }
+        self.constraints.complementarity_min_consumption_sigma = {
+            d: self.model.addLConstr(
+                self.variables.min_consumption_dual[d], 
+                GRB.LESS_EQUAL,
+                big_M * self.variables.complementarity_min_consumption_auxiliary[d]
+            ) for d in self.data.LOADS
+        }
+        self.constraints.complementarity_min_consumption_lx = {
+            d: self.model.addLConstr(
+                self.variables.load_consumption[d],
+                GRB.LESS_EQUAL,
+                big_M * (1 - self.variables.complementarity_min_consumption_auxiliary[d])
+            ) for d in self.data.LOADS
+        }
+
+    def _build_sos1_complementarity_conditions(self):
+        # auxiliary variables (1 associated with each primal inequality constraint)
+        self.variables.complementarity_max_production_auxiliary = {
+            g: self.model.addVar(
+                vtype=GRB.CONTINUOUS, name='Auxiliary variable for complementarity condition on max. production constraint of generator {0}'.format(g)
+            ) for g in self.data.GENERATORS
+        }  
+        self.variables.complementarity_max_consumption_auxiliary = {
+            d: self.model.addVar(
+                vtype=GRB.CONTINUOUS, name='Auxiliary variable for complementarity condition on max. consumption constraint of load {0}'.format(d)
+            ) for d in self.data.LOADS
+        }
+
+        # equality constraints setting the auxilliary variables equal to lhs of constraints. 
+        self.constraints.complementarity_max_production_constraints = {
+            g: self.model.addLConstr(
+                self.variables.complementarity_max_production_auxiliary[g], 
+                GRB.EQUAL,
+                self.data.generator_capacity[g] - self.variables.generator_production[g],
+            ) for g in self.data.GENERATORS if g != 'G1'
+        }
+        self.constraints.complementarity_max_production_constraints['G1'] = self.model.addLConstr(
+            self.variables.complementarity_max_production_auxiliary['G1'], 
+            GRB.EQUAL,
+            self.variables.g1_production_DA - self.variables.generator_production['G1'],
+        )
+        self.constraints.complementarity_max_consumption_constraints = {
+            d: self.model.addLConstr(
+                self.variables.complementarity_max_consumption_auxiliary[d],
+                GRB.EQUAL,
+                self.data.load_capacity[d] - self.variables.load_consumption[d],
+            ) for d in self.data.LOADS
+        }
+
+        # create SOS1 conditions 
+        self.constraints.sos1_min_production = {
+            g: self.model.addSOS(
+                GRB.SOS_TYPE1, [self.variables.min_production_dual[g], self.variables.generator_production[g]]
+            ) for g in self.data.GENERATORS
+        }
+        self.constraints.sos1_max_production = {
+            g: self.model.addSOS(
+                GRB.SOS_TYPE1, [self.variables.max_production_dual[g], self.variables.complementarity_max_production_auxiliary[g]]
+            ) for g in self.data.GENERATORS
+        }
+        self.constraints.sos1_min_consumption = {
+            d: self.model.addSOS(
+                GRB.SOS_TYPE1, [self.variables.min_consumption_dual[d], self.variables.load_consumption[d]]
+            ) for d in self.data.LOADS
+        }
+        self.constraints.sos1_max_consumption = {
+            d: self.model.addSOS(
+                GRB.SOS_TYPE1, [self.variables.max_consumption_dual[d], self.variables.complementarity_max_consumption_auxiliary[d]]
+            ) for d in self.data.LOADS
+        }
+
+    def _build_kkt_complementarity_conditions(self):
+        if self.complementarity_method == 'Big M':
+            self._build_big_m_complementarity_conditions()
+        elif self.complementarity_method == 'SOS1':
+            self._build_sos1_complementarity_conditions()
+        else: 
+            raise NotImplementedError(
+                "The complementarity_method has to be either 'Big M' (default) or 'SOS1'."
+            )
+
+    def _build_objective_function(self):
+        objective = (
+            - self.data.generator_cost['G1'] * self.variables.g1_production_DA 
+            - gp.quicksum(
+                self.data.generator_cost[g] * self.variables.generator_production[g] 
+                + self.data.generator_capacity[g] * self.variables.max_production_dual[g]
+                for g in self.data.GENERATORS if g != 'G1'
+            )
+            + gp.quicksum(
+                self.data.load_utility[d] * self.variables.load_consumption[d]
+                - self.data.load_capacity[d] * self.variables.max_consumption_dual[d]
+                for d in self.data.LOADS
+            )
+        )
+        self.model.setObjective(objective, GRB.MAXIMIZE)
+
+    def _build_model(self):
+        self.model = gp.Model(name='Bilevel offering strategy')
+        self._build_variables()
+        self._build_upper_level_constraint()
+        self._build_kkt_primal_constraints()
+        self._build_kkt_first_order_constraints()
+        self._build_kkt_complementarity_conditions()
+        self._build_objective_function()
+        self.model.update()
+    
+    def _save_results(self):
+        # save objective value
+        self.results.objective_value = self.model.ObjVal
+        # save generator dispatch values
+        self.results.generator_production = {
+            g: self.variables.generator_production[g].x for g in self.data.GENERATORS
+        }
+        # save load consumption values
+        self.results.load_consumption = {
+            d: self.variables.load_consumption[d].x for d in self.data.LOADS
+        }
+        # save price (i.e., dual variable of balance constraint)
+        self.results.price = self.variables.balance_dual.x
+        # save strategic day-ahead offer of generator G1
+        self.results.g1_offer = self.variables.g1_production_DA.x
+
+    def run(self):
+        self.model.optimize()
+        if self.model.status == GRB.OPTIMAL:
+            self._save_results()
+        else:
+            raise RuntimeError(f"optimization of {model.ModelName} was not successful")
+    
+    def display_results(self):
+        print()
+        print("-------------------   RESULTS  -------------------")
+        print("Optimal energy production cost:")
+        print(self.results.objective_value)
+        print("Optimal generator dispatches:")
+        print(self.results.generator_production)
+        print("Price at optimality:")
+        print(self.results.price)
+        print("Strategic offer by generator G1")
+        print(self.results.g1_offer)
+
+
+
+
 
 
 
