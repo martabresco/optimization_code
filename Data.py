@@ -2,6 +2,7 @@ import pandas as pd
 from itertools import product
 import random
 import matplotlib.pyplot as plt
+import numpy as np
 
 #Scenario Creation
 
@@ -28,7 +29,25 @@ def scenarios_creation():
         Demand_scenarios.append(demand_scenario.loc[demand_index].values.tolist())
         Rival_scenarios.append(rival_scenario.loc[rival_index].values.tolist())
     
-    return Demand_scenarios, Rival_scenarios
+    arr_dem=np.transpose(np.array(Demand_scenarios))
+    arr_riv=np.transpose(np.array(Rival_scenarios))
+
+    # print("Demand", arr_dem)
+    # print("Rival", arr_riv)
+        
+    Df_demand=pd.DataFrame(arr_dem,index=['1','2','3','4','5','6',
+                                                     '7','8','9','10','11','12',
+                                                     '13','14','15','16','17','18',
+                                                     '19','20','21','22','23','24'],
+                               columns=['S1','S2','S3','S4','S5','S6',
+                                                     'S7','S8','S9','S10','S11','S12',
+                                                     'S13','S14','S15','S16'])
+    Df_rival=pd.DataFrame(arr_riv,index=['Capacity','Cost'], columns=['S1','S2','S3','S4','S5','S6',
+                                                     'S7','S8','S9','S10','S11','S12',
+                                                     'S13','S14','S15','S16'])
+    
+
+    return Df_demand, Df_rival
 
 #Save this file in your working directory
 
