@@ -40,3 +40,8 @@ print(Demand_distribution)
 #Demand prices (Utility of demand) for each representative hour. It is not dependent on the node 
 Demand_prices = pd.read_excel(file_path5, sheet_name = "Demand prices") # in $/MWh
 print(Demand_prices)
+
+#Investment costs and capacities
+file_path6="Investment.xlsx"
+Investment_data=pd.read_excel(file_path6)
+print(Investment_data)
