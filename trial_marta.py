@@ -213,7 +213,7 @@ class Optimal_Investment():
             name = f'Capacity investment in PV in node {n}')
         for n in self.data.nodes      # Iterating over nodes
         }
-        self.variables.cap_Wind = {
+        self.variables.cap_invest_Wind = {
             n: self.model.addVar(
             lb=0,
             ub=GRB.INFINITY,
@@ -244,12 +244,35 @@ class Optimal_Investment():
 
     
     def _build_upper_level_constraint(self):
-        self.constraints.upper_level_max_production_constraint = self.model.addLConstr(
-            self.variables.g1_production_DA,
-            GRB.LESS_EQUAL,
-            self.data.generator_capacity['G1'],
-            name='Upper-level max production constraint for generator G1',
-        )
+        self.constraints.upper_level_max_inv_conv = {
+            n: self.model.addConstr(
+                self.variables.cap_invest_conv[n] == self.variables.node_bin * data.Investment_data.iloc[0,2],
+                name = 'Max capacity investment for conventionals in node {n}'.format(n))
+            for n in self.data.nodes
+            }
+        self.constraints.upper_level_max_num_investments_per_node={
+            n: self.model.addConstr(
+                self.variables.conv_invest_bin[n]+ self.variables.PV_invest_bin[n] + self.variables.wind_invest_bin[n]<= 3*self.variables.node_bin[n],
+                name = 'We can only invest in one tech per node {n}'.format(n)
+                )
+            for n in self.data.nodes
+            }
+        self.constraint.upper_level_only_invest_one_node= self.model.addConstr(
+            gp.quicksum(self.variables.node_bin[n] for n in self.data.nodes) <= 1,
+            name = 'Only invest in one node of the system')
+        
+        self.constraint_upper_level_max_inv_PV = {
+            n: self.model.addContr(
+                self.variables.cap_invest_PV[n] <= self.variables.PV_invest_bin[n] * data.Investment_data.iloc[1,2],
+                name = 'Max capacity investment for PV in node {n}'.format(n))
+            for n in self.data.nodes
+                }
+        self.constraint_upper_level_max_inv_wind = {
+            n: self.model.addContr(
+                self.variables.cap_invest_Wind[n] <= self.variables.wind_invest_bin[n] * data.Investment_data.iloc[2,2],
+                name = 'Max capacity investment for PV in node {n}'.format(n))
+            for n in self.data.nodes
+                }
 
 
 
@@ -538,14 +561,5 @@ if __name__ == "__main__":
         
         
     )
-
-print(input_data.existing_investor_generator_id)
-print(input_data.existing_investor_generator_node)
-print(input_data.existing_investor_generator_cost)
-print(input_data.existing_investor_generator_capacity)
-print(input_data.line_capacity)
-print(input_data.PV_PF)
-print(input_data.system_demand)
-print(input_data.max_investment_capacity)
 
 
