@@ -1,4 +1,35 @@
 import pandas as pd
+from itertools import product
+import random
+import matplotlib.pyplot as plt
+
+#Scenario Creation
+
+def scenarios_creation():
+    # Import Excel files
+    demand_scenario = pd.read_excel('Demand_scenario_prep.xlsx', index_col=0)
+    rival_scenario = pd.read_excel('Rival_scenario_prep.xlsx', index_col=0)
+    
+    
+    # Transpose DataFrames
+    demand_scenario = demand_scenario.transpose()
+    rival_scenario = rival_scenario.transpose()
+    
+    # Get indexes of each DataFrame
+    demand_indexes = demand_scenario.index
+    rival_indexes = rival_scenario.index
+    
+    # Initialize lists to store scenarios
+    Demand_scenarios = []
+    Rival_scenarios = []
+
+    # Create the Cartesian product of all scenarios
+    for demand_index, rival_index in product(demand_indexes, rival_indexes):
+        Demand_scenarios.append(demand_scenario.loc[demand_index].values.tolist())
+        Rival_scenarios.append(rival_scenario.loc[rival_index].values.tolist())
+    
+    return Demand_scenarios, Rival_scenarios
+
 #Save this file in your working directory
 
 # Load Generation Data from investor
@@ -45,3 +76,12 @@ print(Demand_prices)
 file_path6="Investment.xlsx"
 Investment_data=pd.read_excel(file_path6)
 print(Investment_data)
+
+Demand_scenarios, Rival_scenarios=scenarios_creation()
+
+print("Demand", Demand_scenarios)
+print("Rival", Rival_scenarios)
+
+
+
+
