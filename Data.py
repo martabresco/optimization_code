@@ -1,4 +1,54 @@
 import pandas as pd
+from itertools import product
+import random
+import matplotlib.pyplot as plt
+import numpy as np
+
+#Scenario Creation
+
+def scenarios_creation():
+    # Import Excel files
+    demand_scenario = pd.read_excel('Demand_scenario_prep.xlsx', index_col=0)
+    rival_scenario = pd.read_excel('Rival_scenario_prep.xlsx', index_col=0)
+    
+    
+    # Transpose DataFrames
+    demand_scenario = demand_scenario.transpose()
+    rival_scenario = rival_scenario.transpose()
+    
+    # Get indexes of each DataFrame
+    demand_indexes = demand_scenario.index
+    rival_indexes = rival_scenario.index
+    
+    # Initialize lists to store scenarios
+    Demand_scenarios = []
+    Rival_scenarios = []
+
+    # Create the Cartesian product of all scenarios
+    for demand_index, rival_index in product(demand_indexes, rival_indexes):
+        Demand_scenarios.append(demand_scenario.loc[demand_index].values.tolist())
+        Rival_scenarios.append(rival_scenario.loc[rival_index].values.tolist())
+    
+    arr_dem=np.transpose(np.array(Demand_scenarios))
+    arr_riv=np.transpose(np.array(Rival_scenarios))
+
+    # print("Demand", arr_dem)
+    # print("Rival", arr_riv)
+        
+    Df_demand=pd.DataFrame(arr_dem,index=['1','2','3','4','5','6',
+                                                     '7','8','9','10','11','12',
+                                                     '13','14','15','16','17','18',
+                                                     '19','20','21','22','23','24'],
+                               columns=['S1','S2','S3','S4','S5','S6',
+                                                     'S7','S8','S9','S10','S11','S12',
+                                                     'S13','S14','S15','S16'])
+    Df_rival=pd.DataFrame(arr_riv,index=['Capacity','Cost'], columns=['S1','S2','S3','S4','S5','S6',
+                                                     'S7','S8','S9','S10','S11','S12',
+                                                     'S13','S14','S15','S16'])
+    
+
+    return Df_demand, Df_rival
+
 #Save this file in your working directory
 
 # Load Generation Data from investor
@@ -45,3 +95,12 @@ print(Demand_prices)
 file_path6="Investment.xlsx"
 Investment_data=pd.read_excel(file_path6)
 print(Investment_data)
+
+Demand_scenarios, Rival_scenarios=scenarios_creation()
+
+print("Demand", Demand_scenarios)
+print("Rival", Rival_scenarios)
+
+
+
+
