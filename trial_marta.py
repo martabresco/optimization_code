@@ -240,9 +240,79 @@ class Optimal_Investment():
                 vtype=grb.GRB.BINARY, 
                 name = f'Binary var, 1 if any investment in node {n}'
                 )}
+        
+        ##lower-level dual variables (1 for each constraint of the lower level problem)
+        self.variables.lambda_dual ={
+            (w,h,n):self.model.addVar(
+                lb=-GRB.INFINITY, ub=GRB.INFINITY, 
+                name = f'Lambda for node {n}, scenario{w} and hour {h}')
+                for w in self.data.Rival_scenarios  # Assuming you have a list of generators
+                for h in self.data.hour        # Iterating over hours
+                for n in self.data.nodes       # Iterating over nodes
+                } 
+        self.variables.min_mu_conv_inv ={
+            (w,h,n):self.model.addVar(
+                lb=-GRB.INFINITY, ub=GRB.INFINITY, 
+                name = f'Min mu for node {n}, scenario{w} and hour {h}')
+                for w in self.data.Rival_scenarios  # Assuming you have a list of generators
+                for h in self.data.hour        # Iterating over hours
+                for n in self.data.nodes       # Iterating over nodes
+                }
+        self.variables.max_mu_conv_inv ={
+            (w,h,n):self.model.addVar(
+                lb=-GRB.INFINITY, ub=GRB.INFINITY, 
+                name = f'Max mu for node {n}, scenario{w} and hour {h}')
+                for w in self.data.Rival_scenarios  # Assuming you have a list of generators
+                for h in self.data.hour        # Iterating over hours
+                for n in self.data.nodes       # Iterating over nodes
+                }
+        self.variables.min_sigma_PV ={
+            (w,h,n):self.model.addVar(
+                lb=-GRB.INFINITY, ub=GRB.INFINITY, 
+                name = f'Min sigma PV for node {n}, scenario{w} and hour {h}')
+                for w in self.data.Rival_scenarios  # Assuming you have a list of generators
+                for h in self.data.hour        # Iterating over hours
+                for n in self.data.nodes       # Iterating over nodes
+                }
+        self.variables.max_sigma_PV ={
+            (w,h,n):self.model.addVar(
+                lb=-GRB.INFINITY, ub=GRB.INFINITY, 
+                name = f'Max sigma PV for node {n}, scenario{w} and hour {h}')
+                for w in self.data.Rival_scenarios  # Assuming you have a list of generators
+                for h in self.data.hour        # Iterating over hours
+                for n in self.data.nodes       # Iterating over nodes
+                }
+        self.variables.min_sigma_wind ={
+            (w,h,n):self.model.addVar(
+                lb=-GRB.INFINITY, ub=GRB.INFINITY, 
+                name = f'Min sigma wind for node {n}, scenario{w} and hour {h}')
+                for w in self.data.Rival_scenarios  # Assuming you have a list of generators
+                for h in self.data.hour        # Iterating over hours
+                for n in self.data.nodes       # Iterating over nodes
+                }
+        self.variables.max_sigma_wind ={
+            (w,h,n):self.model.addVar(
+                lb=-GRB.INFINITY, ub=GRB.INFINITY, 
+                name = f'Max sigma wind for node {n}, scenario{w} and hour {h}')
+                for w in self.data.Rival_scenarios  # Assuming you have a list of generators
+                for h in self.data.hour        # Iterating over hours
+                for n in self.data.nodes       # Iterating over nodes
+                }
+        self.variables.min_sigma_wind ={
+            (w,h,n):self.model.addVar(
+                lb=-GRB.INFINITY, ub=GRB.INFINITY, 
+                name = f'Min sigma wind for node {n}, scenario{w} and hour {h}')
+                for w in self.data.Rival_scenarios  # Assuming you have a list of generators
+                for h in self.data.hour        # Iterating over hours
+                for n in self.data.nodes       # Iterating over nodes
+                }
+        
 
 
     
+
+
+
     def _build_upper_level_constraint(self):
         self.constraints.upper_level_max_inv_conv = {
             n: self.model.addConstr(
