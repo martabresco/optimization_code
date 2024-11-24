@@ -16,7 +16,7 @@ from Data import Rival_scenarios
 from Data import Demand_scenarios
 
 nodes = list(range(1, 25))
-scenarios=list(range(1,4))
+K = 1.6e9  #in dollars, max investment budget
 
 class Expando(object):
     '''
@@ -121,7 +121,7 @@ class Optimal_Investment():
         self.variables.prod_new_conv_unit = {
             (w, h, n): self.model.addVar(
                 lb=0,
-                ub=Investment_data.iloc[0, 2],  # Upper bound is taken from Investment_data for this example
+                ub=GRB.INFINITY,  
                 name=f'Electricity production of candidate  conventional unit  at node {n}, scenario {w} and hour {h}'
                 )
             for w in self.data.Rival_scenarios  # Assuming you have a list of generators
@@ -131,7 +131,7 @@ class Optimal_Investment():
         self.variables.prod_PV ={
             (w, h, n): self.model.addVar(
                 lb=0,
-                ub=Investment_data.iloc[1, 2],  # Upper bound is taken from Investment_data for this example
+                ub=GRB.INFINITY,  # Upper bound is taken from Investment_data for this example
                 name=f'Electricity production of candidate  PV unit  at node {n}, scenario {w} and hour {h}'
                 )
             for w in self.data.Rival_scenarios  # Assuming you have a list of generators
@@ -141,7 +141,7 @@ class Optimal_Investment():
         self.variables.prod_wind ={
             (w, h, n): self.model.addVar(
                 lb=0,
-                ub=Investment_data.iloc[2, 2],  # Upper bound is taken from Investment_data for this example
+                ub=GRB.INFINITY,  # Upper bound is taken from Investment_data for this example
                 name=f'Electricity production of candidate  wind unit  at node {n}, scenario {w} and hour {h}'
                 )
             for w in self.data.Rival_scenarios  # Assuming you have a list of generators
@@ -270,9 +270,15 @@ class Optimal_Investment():
         self.constraint_upper_level_max_inv_wind = {
             n: self.model.addContr(
                 self.variables.cap_invest_Wind[n] <= self.variables.wind_invest_bin[n] * data.Investment_data.iloc[2,2],
-                name = 'Max capacity investment for PV in node {n}'.format(n))
+                name = 'Max capacity investment for wind in node {n}'.format(n))
             for n in self.data.nodes
                 }
+        self.constraint.upper_level_max_investment_budget= self.model.addConstr(
+            gp.quicksum(Investment_data.iloc[0,1]*self.variables.cap_invest_conv[n]+
+                        Investment_data.iloc[1,1]*self.variables.cap_invest_PV[n]+
+                        Investment_data.iloc[2,1]*self.variables.cap_invest_wind[n]  for n in self.data.nodes) <= K,
+            name = 'Budget limit')
+        
 
 
 
