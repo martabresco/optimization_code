@@ -124,7 +124,7 @@ class Optimal_Investment():
                 ub=GRB.INFINITY,  
                 name=f'Electricity production of candidate  conventional unit  at node {n}, scenario {w} and hour {h}'
                 )
-            for w in self.data.Rival_scenarios  # Assuming you have a list of generators
+            for w in self.data.Rival_scenarios.shape[1]  # Assuming you have a list of generators
             for h in self.data.hour        # Iterating over hours
             for n in self.data.nodes       # Iterating over nodes
             }
@@ -134,7 +134,7 @@ class Optimal_Investment():
                 ub=GRB.INFINITY,  # Upper bound is taken from Investment_data for this example
                 name=f'Electricity production of candidate  PV unit  at node {n}, scenario {w} and hour {h}'
                 )
-            for w in self.data.Rival_scenarios  # Assuming you have a list of generators
+            for w in self.data.Rival_scenarios.shape[1] # Assuming you have a list of generators
             for h in self.data.hour        # Iterating over hours
             for n in self.data.nodes       # Iterating over nodes
             } #production from new pv unit located in n, under scenario w and at time h
@@ -144,7 +144,7 @@ class Optimal_Investment():
                 ub=GRB.INFINITY,  # Upper bound is taken from Investment_data for this example
                 name=f'Electricity production of candidate  wind unit  at node {n}, scenario {w} and hour {h}'
                 )
-            for w in self.data.Rival_scenarios  # Assuming you have a list of generators
+            for w in self.data.Rival_scenarios.shape[1] # Assuming you have a list of generators
             for h in self.data.hour        # Iterating over hours
             for n in self.data.nodes       # Iterating over nodes
             }
@@ -154,7 +154,7 @@ class Optimal_Investment():
                 ub=investor_generation_data.iloc[u-1, 2], #maybe there is an error here
                 name=f'Electricity production of existing conventional investor from unit {u} at node {n}, scenario {w} and hour {h}'
                 )
-            for w in self.data.Rival_scenarios  # Assuming you have a list of generators
+            for w in self.data.Rival_scenarios.shape[1]  # Assuming you have a list of generators
             for h in self.data.hour        # Iterating over hours
             for n in self.data.nodes       # Iterating over nodes
             for u in self.data.existing_investor_generator_id
@@ -165,7 +165,7 @@ class Optimal_Investment():
                 ub=rival_generation_data.iloc[u-1, 2],
                 name = f'Electricity production of existing conventional from rival unit{u}, at node {n}, scenario {w} and hour {h}'
                 )#maybe there is an error here)
-            for w in self.data.Rival_scenarios  # Assuming you have a list of generators
+            for w in self.data.Rival_scenarios.shape[1] # Assuming you have a list of generators
             for h in self.data.hour        # Iterating over hours
             for n in self.data.nodes       # Iterating over nodes
             for u in self.data.existing_rival_generator_id #iterating over units 
@@ -176,7 +176,7 @@ class Optimal_Investment():
                 ub=Rival_scenarios.iloc[0,w], #maybe this is wrong
                 name = f'Electricity production of new conventional from rival at node {n}, scenario {w} and hour {h}'
                 )#maybe there is an error here)
-            for w in self.data.Rival_scenarios  # Assuming you have a list of generators
+            for w in self.data.Rival_scenarios.shape[1]  # Assuming you have a list of generators
             for h in self.data.hour        # Iterating over hours
             for n in self.data.nodes       # Iterating over nodes
             }
@@ -186,7 +186,7 @@ class Optimal_Investment():
                 ub=Demand_scenarios.iloc[h,w], #maybe this is wrong
                 name = f'Electricity consumed by demand at node {n}, scenario {w} and hour {h}'
                 )#maybe there is an error here)
-            for w in self.data.Rival_scenarios  # Assuming you have a list of generators
+            for w in self.data.Rival_scenarios.shape[1]  # Assuming you have a list of generators
             for h in self.data.hour        # Iterating over hours
             for n in self.data.nodes       # Iterating over nodes
             }
@@ -246,7 +246,7 @@ class Optimal_Investment():
             (w,h,n):self.model.addVar(
                 lb=-GRB.INFINITY, ub=GRB.INFINITY, 
                 name = f'Lambda for node {n}, scenario{w} and hour {h}')
-                for w in self.data.Rival_scenarios  # Assuming you have a list of generators
+                for w in self.data.Rival_scenarios.shape[1]  # Assuming you have a list of generators
                 for h in self.data.hour        # Iterating over hours
                 for n in self.data.nodes       # Iterating over nodes
                 } 
@@ -254,7 +254,7 @@ class Optimal_Investment():
             (w,h,n):self.model.addVar(
                 lb=-GRB.INFINITY, ub=GRB.INFINITY, 
                 name = f'Min mu for node {n}, scenario{w} and hour {h}')
-                for w in self.data.Rival_scenarios  # Assuming you have a list of generators
+                for w in self.data.Rival_scenarios.shape[1]  # Assuming you have a list of generators
                 for h in self.data.hour        # Iterating over hours
                 for n in self.data.nodes       # Iterating over nodes
                 }
@@ -262,7 +262,7 @@ class Optimal_Investment():
             (w,h,n):self.model.addVar(
                 lb=-GRB.INFINITY, ub=GRB.INFINITY, 
                 name = f'Max mu for node {n}, scenario{w} and hour {h}')
-                for w in self.data.Rival_scenarios  # Assuming you have a list of generators
+                for w in self.data.Rival_scenarios.shape[1] # Assuming you have a list of generators
                 for h in self.data.hour        # Iterating over hours
                 for n in self.data.nodes       # Iterating over nodes
                 }
@@ -270,7 +270,7 @@ class Optimal_Investment():
             (w,h,n):self.model.addVar(
                 lb=-GRB.INFINITY, ub=GRB.INFINITY, 
                 name = f'Min sigma PV for node {n}, scenario{w} and hour {h}')
-                for w in self.data.Rival_scenarios  # Assuming you have a list of generators
+                for w in self.data.Rival_scenarios.shape[1]  # Assuming you have a list of generators
                 for h in self.data.hour        # Iterating over hours
                 for n in self.data.nodes       # Iterating over nodes
                 }
@@ -278,7 +278,7 @@ class Optimal_Investment():
             (w,h,n):self.model.addVar(
                 lb=-GRB.INFINITY, ub=GRB.INFINITY, 
                 name = f'Max sigma PV for node {n}, scenario{w} and hour {h}')
-                for w in self.data.Rival_scenarios  # Assuming you have a list of generators
+                for w in self.data.Rival_scenarios.shape[1]  # Assuming you have a list of generators
                 for h in self.data.hour        # Iterating over hours
                 for n in self.data.nodes       # Iterating over nodes
                 }
@@ -286,7 +286,7 @@ class Optimal_Investment():
             (w,h,n):self.model.addVar(
                 lb=-GRB.INFINITY, ub=GRB.INFINITY, 
                 name = f'Min sigma wind for node {n}, scenario{w} and hour {h}')
-                for w in self.data.Rival_scenarios  # Assuming you have a list of generators
+                for w in self.data.Rival_scenarios.shape[1]  # Assuming you have a list of generators
                 for h in self.data.hour        # Iterating over hours
                 for n in self.data.nodes       # Iterating over nodes
                 }
@@ -294,19 +294,97 @@ class Optimal_Investment():
             (w,h,n):self.model.addVar(
                 lb=-GRB.INFINITY, ub=GRB.INFINITY, 
                 name = f'Max sigma wind for node {n}, scenario{w} and hour {h}')
-                for w in self.data.Rival_scenarios  # Assuming you have a list of generators
+                for w in self.data.Rival_scenarios.shape[1] # Assuming you have a list of generators
                 for h in self.data.hour        # Iterating over hours
                 for n in self.data.nodes       # Iterating over nodes
                 }
-        self.variables.min_sigma_wind ={
+        self.variables.min_mu_existing ={
             (w,h,n):self.model.addVar(
                 lb=-GRB.INFINITY, ub=GRB.INFINITY, 
-                name = f'Min sigma wind for node {n}, scenario{w} and hour {h}')
-                for w in self.data.Rival_scenarios  # Assuming you have a list of generators
+                name = f'Min mu existing generators for node {n}, scenario{w} and hour {h}')
+                for w in self.data.Rival_scenarios.shape[1]  # Assuming you have a list of generators
                 for h in self.data.hour        # Iterating over hours
                 for n in self.data.nodes       # Iterating over nodes
                 }
-        
+        self.variables.max_mu_existing ={
+            (w,h,n):self.model.addVar(
+                lb=-GRB.INFINITY, ub=GRB.INFINITY, 
+                name = f'Max mu existing generators for node {n}, scenario{w} and hour {h}')
+                for w in self.data.Rival_scenarios.shape[1]  # Assuming you have a list of generators
+                for h in self.data.hour        # Iterating over hours
+                for n in self.data.nodes       # Iterating over nodes
+                }
+        self.variables.min_mu_rival ={
+            (w,h,n):self.model.addVar(
+                lb=-GRB.INFINITY, ub=GRB.INFINITY, 
+                name = f'Min mu rival generators for node {n}, scenario{w} and hour {h}')
+                for w in self.data.Rival_scenarios.shape[1]  # Assuming you have a list of generators
+                for h in self.data.hour        # Iterating over hours
+                for n in self.data.nodes       # Iterating over nodes
+                }
+        self.variables.max_mu_rival ={
+            (w,h,n):self.model.addVar(
+                lb=-GRB.INFINITY, ub=GRB.INFINITY, 
+                name = f'max mu rival generators for node {n}, scenario{w} and hour {h}')
+                for w in self.data.Rival_scenarios.shape[1]  # Assuming you have a list of generators
+                for h in self.data.hour        # Iterating over hours
+                for n in self.data.nodes       # Iterating over nodes
+                }
+        self.variables.min_mu_rival_new ={
+            (w,h,n):self.model.addVar(
+                lb=-GRB.INFINITY, ub=GRB.INFINITY, 
+                name = f'min mu rival new generators for node {n}, scenario{w} and hour {h}')
+                for w in self.data.Rival_scenarios.shape[1]  # Assuming you have a list of generators
+                for h in self.data.hour        # Iterating over hours
+                for n in self.data.nodes       # Iterating over nodes
+                }
+        self.variables.max_mu_rival_new ={
+            (w,h,n):self.model.addVar(
+                lb=-GRB.INFINITY, ub=GRB.INFINITY, 
+                name = f'max mu rival new generators for node {n}, scenario{w} and hour {h}')
+                for w in self.data.Rival_scenarios.shape[1]  # Assuming you have a list of generators
+                for h in self.data.hour        # Iterating over hours
+                for n in self.data.nodes       # Iterating over nodes
+                }
+        self.variables.min_sigma_demand ={
+            (w,h,n):self.model.addVar(
+                lb=-GRB.INFINITY, ub=GRB.INFINITY, 
+                name = f'min sigma demand for node {n}, scenario{w} and hour {h}')
+                for w in self.data.Rival_scenarios.shape[1]  # Assuming you have a list of generators
+                for h in self.data.hour        # Iterating over hours
+                for n in self.data.nodes       # Iterating over nodes
+                }
+        self.variables.gamma_f ={
+            (w,h,n):self.model.addVar(
+                lb=-GRB.INFINITY, ub=GRB.INFINITY, 
+                name = f'line flow constraint dual variable gamma')
+                for w in self.data.Rival_scenarios.shape[1]  # Assuming you have a list of generators
+                for h in self.data.hour        # Iterating over hours
+                for n in self.data.nodes       # Iterating over nodes
+                }
+        self.variables.min_epsilon_theta ={
+            (w,h,n):self.model.addVar(
+                lb=-GRB.INFINITY, ub=GRB.INFINITY, 
+                name = f'min volatge angle dual for node {n}, scenario{w} and hour {h}')
+                for w in self.data.Rival_scenarios.shape[1]  # Assuming you have a list of generators
+                for h in self.data.hour        # Iterating over hours
+                for n in self.data.nodes       # Iterating over nodes
+                }
+        self.variables.max_epsilon_theta ={
+            (w,h,n):self.model.addVar(
+                lb=-GRB.INFINITY, ub=GRB.INFINITY, 
+                name = f'max volatge angle dual for node {n}, scenario{w} and hour {h}')
+                for w in self.data.Rival_scenarios.shape[1]  # Assuming you have a list of generators
+                for h in self.data.hour        # Iterating over hours
+                for n in self.data.nodes       # Iterating over nodes
+                }
+        self.variables.ref_epsilon ={
+            (w,h):self.model.addVar(
+                lb=-GRB.INFINITY, ub=GRB.INFINITY, 
+                name = f'reference angle dual variable for scenario{w} and hour {h}')
+                for w in self.data.Rival_scenarios.shape[1]  # Assuming you have a list of generators
+                for h in self.data.hour        # Iterating over hours
+                }
 
 
     
