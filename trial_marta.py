@@ -17,6 +17,10 @@ from Data import Demand_scenarios
 
 nodes = list(range(1, 25))
 K = 1.6e9  #in dollars, max investment budget
+<<<<<<< Updated upstream
+=======
+cand_Conv_cost=7.24
+>>>>>>> Stashed changes
 
 class Expando(object):
     '''
