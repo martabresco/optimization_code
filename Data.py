@@ -2,6 +2,7 @@ import pandas as pd
 from itertools import product
 import random
 import matplotlib.pyplot as plt
+import numpy as np
 
 #Scenario Creation
 
@@ -28,7 +29,25 @@ def scenarios_creation():
         Demand_scenarios.append(demand_scenario.loc[demand_index].values.tolist())
         Rival_scenarios.append(rival_scenario.loc[rival_index].values.tolist())
     
-    return Demand_scenarios, Rival_scenarios
+    arr_dem=np.transpose(np.array(Demand_scenarios))
+    arr_riv=np.transpose(np.array(Rival_scenarios))
+
+    # print("Demand", arr_dem)
+    # print("Rival", arr_riv)
+        
+    Df_demand=pd.DataFrame(arr_dem,index=['1','2','3','4','5','6',
+                                                     '7','8','9','10','11','12',
+                                                     '13','14','15','16','17','18',
+                                                     '19','20','21','22','23','24'],
+                               columns=['S1','S2','S3','S4','S5','S6',
+                                                     'S7','S8','S9','S10','S11','S12',
+                                                     'S13','S14','S15','S16'])
+    Df_rival=pd.DataFrame(arr_riv,index=['Capacity','Cost'], columns=['S1','S2','S3','S4','S5','S6',
+                                                     'S7','S8','S9','S10','S11','S12',
+                                                     'S13','S14','S15','S16'])
+    
+
+    return Df_demand, Df_rival
 
 #Save this file in your working directory
 
@@ -81,6 +100,34 @@ Demand_scenarios, Rival_scenarios=scenarios_creation()
 
 print("Demand", Demand_scenarios)
 print("Rival", Rival_scenarios)
+
+Omega_n_sets = {
+    1: [2,3,5],
+    2: [1,4,6],
+    3: [1,9,24],
+    4: [2,9],
+    5: [1,10],
+    6: [2,10],
+    7: [8],
+    8: [7,9,10],
+    9: [3,4,8,11,12],
+    10: [5,6,8,11,12],
+    11: [9,13,10,14],
+    12: [9,10,13,23],
+    13: [11,12,23],
+    14: [11,16],
+    15: [16,21,24],
+    16: [14,15,17,19],
+    17: [16,18,22],
+    18: [17,21],
+    19: [16,20],
+    20: [19,23],
+    21: [22,18,15],
+    22: [17,21],
+    23: [12,13,20],
+    24: [3,15],
+}
+
 
 
 
