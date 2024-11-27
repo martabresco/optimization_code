@@ -15,6 +15,7 @@ from Data import Investment_data
 from Data import Rival_scenarios
 from Data import Demand_scenarios
 from Data import Omega_n_sets
+from Data import matrix_B
 
 nodes = list(range(1, 25))
 K = 1.6e9  #in dollars, max investment budget
@@ -70,7 +71,7 @@ class InputData: #Idea: create one class for Input variables and one class for t
         #Investment data
         technology_type:list,
         investment_cost:dict[str,int],
-        max_investment_capacity:dict[str,int]
+        max_investment_capacity:dict[str,int],
         omega_node_set:dict[int,list]
         
         #Doubt: do I also need to import demand scenarios and Rival scenarios as an attribute?
@@ -107,7 +108,7 @@ class InputData: #Idea: create one class for Input variables and one class for t
         self.technology_type=technology_type
         self.investment_cost=investment_cost
         self.max_investment_capacity=max_investment_capacity
-        self.omega_node_set
+        self.omega_node_set = omega_node_set
 
 
 class Optimal_Investment():
@@ -503,7 +504,13 @@ class Optimal_Investment():
         
         self.constraints.lower_level_line_flow = {
             (w,h,n): self.model.addConstr(
-                gp.quicksum(1/lines_data[] -self.variables.lambda_dual[w][h][n]-self.variables.min_sigma_demand[w][h][n] +self.variables.max_sigma_demand[w][h][n] == 0,
+                gp.quicksum(matrix_B[n][m] *self.variables.lambda_dual[w][h][n] for m in self.data.nodes)-
+                gp.quicksum(matrix_B[m][n]*self.variables.lambda_dual[w][h][m] for m in self.data.nodes) -
+                gp.quicksum(matrix_B[n][m]*self.variables.gamma_f[w][h][n] for m in self.data.nodes)-
+                gp.quicksum(matrix_B[m][n]*self.variables.gamma_f[w][h][m] for m in self.data.nodes) -
+                self.variables.min_epsilon_theta[w][h][n]+self.variables.max_epsilon_theta[w][h][n]
+                ==0,
+                #this lamda m might be wrong
                 #maybe we start indexing at 0, then the -1 is not necessary
                 name = 'Lower level prod for demand for scenario {w}, in hour {h}, in node {n}'.format(n))
                 for w in range(self.data.Rival_scenarios.shape[1])  # Assuming you have a list of generators
@@ -517,22 +524,26 @@ class Optimal_Investment():
     
     def _build_kkt_first_order_constraints(self):
         #lagrangian
-        self.constraints.first_order_condition_generator_production = {
-            g: self.model.addLConstr(
-                self.data.generator_cost[g] - self.variables.balance_dual - self.variables.min_production_dual[g] + self.variables.max_production_dual[g],
+        self.constraints.second_level_line = {
+        (w,h,n): self.model.addLConstr(
+                self.variables.demand_consumed[w][h][n]+gp.quicksum(matrix_B[n][m]*(self.variables.theta[w][h][n]-self.variables.theta[w][h][m]))
+                - self.variables.prod_new_conv_unit[w][h][n] -
+                self.variables.prod_PV [w][h][n] - self.variables.prod_wind[w][h][n] - 
+                self.variables.prod_existing_conv [w][h][n] - self.variables.prod_existing_rival [w][h][n] - 
+                self.variables.prod_new_conv_rival [w][h][n]),
                 GRB.EQUAL,
                 0,
-                name='1st order condition - wrt to production {0}'.format(g)
-            ) for g in self.data.GENERATORS
+                name='second level constraint ')
+            for w in range(self.data.Rival_scenarios.shape[1])  # Assuming you have a list of generators
+            for h in self.data.hour        # Iterating over hours
+            for n in self.data.nodes       # Iterating over nodes
         } 
-        self.constraints.first_order_condition_load_consumption = {
-            d: self.model.addLConstr(
-                - self.data.load_utility[d] + self.variables.balance_dual - self.variables.min_consumption_dual[d] + self.variables.max_consumption_dual[d],
-                GRB.EQUAL,
-                0,
-                name='1st order condition - wrt to consumption {0}'.format(d)
-            ) for d in self.data.LOADS
-        }
+ 
+    
+    
+    
+    
+    
 
     def _build_sos1_complementarity_conditions(self):
         # auxiliary variables (1 associated with each primal inequality constraint)
