@@ -96,6 +96,12 @@ file_path6="Investment.xlsx"
 Investment_data=pd.read_excel(file_path6)
 print(Investment_data)
 
+
+#Day-ahead pirces, simpler model 
+file_path7="DA_prices.xlsx" 
+DA_prices = pd.read_excel(file_path7, usecols=[1]) # in $/MWh
+print("Day-ahead",DA_prices)
+
 Demand_scenarios, Rival_scenarios=scenarios_creation()
 
 print("Demand", Demand_scenarios)
