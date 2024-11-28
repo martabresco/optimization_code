@@ -197,5 +197,26 @@ matrix_B = pd.DataFrame(matrix, index=range(1, num_nodes + 1), columns=range(1, 
 matrix_B
 
 
+df = lines_data
+
+# Determine the number of nodes
+num_nodes = max(df["From"].max(), df["To"].max())
+
+# Initialize an n x n matrix with zeros
+capacity_matrix = np.zeros((num_nodes, num_nodes))
+
+# Populate the matrix with capacities
+for _, row in df.iterrows():
+    m, n, capacity = int(row["From"]), int(row["To"]), row["Capacity (MVA)"]
+    capacity_matrix[m - 1, n - 1] = capacity  # Adjusting for 0-based indexing
+    capacity_matrix[n - 1, m - 1] = capacity  # Assuming undirected graph
+
+# Convert to DataFrame for better visualization (optional)
+capacity_matrix = pd.DataFrame(capacity_matrix, index=range(1, num_nodes + 1), columns=range(1, num_nodes + 1))
+
+# Print or return the matrix
+print(capacity_matrix)
+
+
 
 

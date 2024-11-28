@@ -16,6 +16,7 @@ from Data import Rival_scenarios
 from Data import Demand_scenarios
 from Data import Omega_n_sets
 from Data import matrix_B
+from Data import capacity_matrix
 
 nodes = list(range(1, 25))
 K = 1.6e9  #in dollars, max investment budget
@@ -521,27 +522,197 @@ class Optimal_Investment():
         
         
         
-    
+ ##################### Go through here with Marta #####################################################################   
     def _build_kkt_first_order_constraints(self):
         #lagrangian
-        self.constraints.second_level_line = {
+        #define m?
+        self.constraints.second_level_primal_line = {
         (w,h,n): self.model.addLConstr(
                 self.variables.demand_consumed[w][h][n]+gp.quicksum(matrix_B[n][m]*(self.variables.theta[w][h][n]-self.variables.theta[w][h][m]))
                 - self.variables.prod_new_conv_unit[w][h][n] -
                 self.variables.prod_PV [w][h][n] - self.variables.prod_wind[w][h][n] - 
                 self.variables.prod_existing_conv [w][h][n] - self.variables.prod_existing_rival [w][h][n] - 
-                self.variables.prod_new_conv_rival [w][h][n]),
-                GRB.EQUAL,
-                0,
-                name='second level constraint ')
+                self.variables.prod_new_conv_rival [w][h][n],
+                GRB.EQUAL,0,
+                name='second level constraint, primal,line')
+            for w in range(self.data.Rival_scenarios.shape[1])  # Assuming you have a list of generators
+            for h in self.data.hour        # Iterating over hours
+            for n in self.data.nodes       # Iterating over nodes
+        } 
+        
+        self.constraints.second_level_primal_conv_lower_bound = {
+        (w,h,n): self.model.addLConstr(
+                self.variables.prod_new_conv_unit[w][h][n], 
+                GRB.GREATER_EQUAL,0,
+                name='second level constraint, primal conv lower bound ')
             for w in range(self.data.Rival_scenarios.shape[1])  # Assuming you have a list of generators
             for h in self.data.hour        # Iterating over hours
             for n in self.data.nodes       # Iterating over nodes
         } 
  
+        self.constraints.second_level_primal_conv_upper_bound = {
+        (w,h,n): self.model.addLConstr(
+                self.variables.prod_new_conv_unit[w][h][n], 
+                GRB.LESS_EQUAL,self.variables.cap_invest_conv[n] ,
+                name='second level constraint, primal conv upper bound ')
+            for w in range(self.data.Rival_scenarios.shape[1])  # Assuming you have a list of generators
+            for h in self.data.hour        # Iterating over hours
+            for n in self.data.nodes       # Iterating over nodes
+        } 
+        
+        self.constraints.second_level_primal_PV_lower_bound = {
+        (w,h,n): self.model.addLConstr(
+                self.variables.prod_PV[w][h][n], 
+                GRB.GREATER_EQUAL,0,
+                name='second level constraint, primal PV lower bound ')
+            for w in range(self.data.Rival_scenarios.shape[1])  # Assuming you have a list of generators
+            for h in self.data.hour        # Iterating over hours
+            for n in self.data.nodes       # Iterating over nodes
+        } 
+ 
+        self.constraints.second_level_primal_PV_upper_bound = {
+        (w,h,n): self.model.addLConstr(
+                self.variables.prod_PV[w][h][n], 
+                GRB.LESS_EQUAL,PV_PF_data[h,1][n]*self.variables.cap_invest_PV[n] ,
+                name='second level constraint, primal PV upper bound ')
+            for w in range(self.data.Rival_scenarios.shape[1])  # Assuming you have a list of generators
+            for h in self.data.hour        # Iterating over hours
+            for n in self.data.nodes       # Iterating over nodes
+        } 
+
+        self.constraints.second_level_primal_wind_lower_bound = {
+        (w,h,n): self.model.addLConstr(
+                self.variables.prod_wind[w][h][n] , 
+                GRB.GREATER_EQUAL,0,
+                name='second level constraint, primal wind lower bound ')
+            for w in range(self.data.Rival_scenarios.shape[1])  # Assuming you have a list of generators
+            for h in self.data.hour        # Iterating over hours
+            for n in self.data.nodes       # Iterating over nodes
+        } 
+ 
+        self.constraints.second_level_primal_wind_upper_bound = {
+        (w,h,n): self.model.addLConstr(
+                self.variables.prod_wind[w][h][n], 
+                GRB.LESS_EQUAL,Wind_PF_data[h,1][n]* self.variables.cap_invest_Wind[n] ,
+                name='second level constraint, primal wind upper bound ')
+            for w in range(self.data.Rival_scenarios.shape[1])  # Assuming you have a list of generators
+            for h in self.data.hour        # Iterating over hours
+            for n in self.data.nodes       # Iterating over nodes
+        } 
+        
+        self.constraints.second_level_primal_exist_lower_bound = {
+        (w,h,n): self.model.addLConstr(
+                self.variables.prod_existing_conv[w][h][n] , 
+                GRB.GREATER_EQUAL,0,
+                name='second level constraint, primal existing lower bound ')
+            for w in range(self.data.Rival_scenarios.shape[1])  # Assuming you have a list of generators
+            for h in self.data.hour        # Iterating over hours
+            for n in self.data.nodes       # Iterating over nodes
+        } 
+ 
+        #check again, because not all nodes have a existing plant...
+        self.constraints.second_level_primal_exist_upper_bound = {
+        (w,h,n): self.model.addLConstr(
+                self.variables.prod_existing_conv[w][h][n], 
+                GRB.LESS_EQUAL, investor_generation_data[n,"Pmax [MW]"] ,
+                name='second level constraint, primal existing upper bound ')
+            for w in range(self.data.Rival_scenarios.shape[1])  # Assuming you have a list of generators
+            for h in self.data.hour        # Iterating over hours
+            for n in range(investor_generation_data.shape[0])       # Iterating over nodes where there is a generator
+        }
+        
+        self.constraints.second_level_primal_rival_lower_bound = {
+        (w,h,n): self.model.addLConstr(
+                self.variables.prod_existing_rival[w][h][n] , 
+                GRB.GREATER_EQUAL,0,
+                name='second level constraint, primal rival lower bound ')
+            for w in range(self.data.Rival_scenarios.shape[1])  # Assuming you have a list of generators
+            for h in self.data.hour        # Iterating over hours
+            for n in self.data.nodes       # Iterating over nodes
+        } 
+ 
+        self.constraints.second_level_primal_rival_upper_bound = {
+        (w,h,n): self.model.addLConstr(
+                self.variables.prod_existing_rival[w][h][n], 
+                GRB.LESS_EQUAL, rival_generation_data[n,"Pmax [MW]"][w] ,
+                name='second level constraint, primal rival upper bound ')
+            for w in range(self.data.Rival_scenarios.shape[1])  # Assuming you have a list of generators
+            for h in self.data.hour        # Iterating over hours
+            for n in range(rival_generation_data.shape[0])       # Iterating over nodes where there is a generator
+        }
+        
+        self.constraints.second_level_primal_rival_new_lower_bound = {
+        (w,h,n): self.model.addLConstr(
+                self.variables.prod_new_conv_rival[w][h][n], 
+                GRB.GREATER_EQUAL,0,
+                name='second level constraint, primal rival new lower bound ')
+            for w in range(self.data.Rival_scenarios.shape[1])  # Assuming you have a list of generators
+            for h in self.data.hour        # Iterating over hours
+            for n in self.data.nodes       # Iterating over nodes
+        } 
+ 
+        self.constraints.second_level_primal_rival_new_upper_bound = {
+        (w,h,n): self.model.addLConstr(
+                self.variables.prod_new_conv_rival[w][h][n], 
+                GRB.LESS_EQUAL, Rival_scenarios["Capacity",w][n] ,
+                name='second level constraint, primal rival new upper bound ')
+            for w in range(self.data.Rival_scenarios.shape[1])  # Assuming you have a list of generators
+            for h in self.data.hour        # Iterating over hours
+            for n in self.data.nodes      # Iterating over nodes where there is a generator
+        }
+        
+        self.constraints.second_level_primal_demand_lower_bound = {
+        (w,h,n): self.model.addLConstr(
+                self.variables.demand_consumed[w][h][n] , 
+                GRB.GREATER_EQUAL,0,
+                name='second level constraint, primal demand lower bound ')
+            for w in range(self.data.Rival_scenarios.shape[1])  # Assuming you have a list of generators
+            for h in self.data.hour        # Iterating over hours
+            for n in self.data.nodes       # Iterating over nodes
+        } 
+        #check with marta!!
+        self.constraints.second_level_primal_demand_upper_bound = {
+        (w,h,n): self.model.addLConstr(
+                self.variables.demand_consumed[w][h][n], 
+                GRB.LESS_EQUAL, (Demand_distribution[n,2]/100)* Demand_Scenarios[w,h] ,
+                name='second level constraint, primal demand upper bound ')
+            for w in range(self.data.Rival_scenarios.shape[1])  # Assuming you have a list of generators
+            for h in self.data.hour        # Iterating over hours
+            for n in range(self.data.Demand_distribution.shape[1])     # Iterating over nodes where there is a generator
+        }
     
+
+        self.constraints.second_level_primal_line = {
+        (w,h,n): self.model.addLConstr(
+                (matrix_B[n][m]*(self.variables.theta[w][h][n]-self.variables.theta[w][h][m])for m in self.data.nodes),
+                GRB.LESS_EQUAL,(capacity_matrix[n,m] for m in self.data.nodes) ,
+                name='second level constraint, primal,line')
+            for w in range(self.data.Rival_scenarios.shape[1])  # Assuming you have a list of generators
+            for h in self.data.hour        # Iterating over hours
+            for n in self.data.nodes       # Iterating over nodes
+        } 
     
-    
+        self.constraints.second_level_primal_theta_lower_bound = {
+        (w,h,n): self.model.addLConstr(
+                self.variables.theta[w][h][n] , 
+                GRB.GREATER_EQUAL,-np.pi,
+                name='second level constraint, primal theta lower bound ')
+            for w in range(self.data.Rival_scenarios.shape[1])  # Assuming you have a list of generators
+            for h in self.data.hour        # Iterating over hours
+            for n in self.data.nodes       # Iterating over nodes
+        } 
+
+        self.constraints.second_level_primal_theta_upper_bound = {
+        (w,h,n): self.model.addLConstr(
+                elf.variables.theta[w][h][n], 
+                GRB.LESS_EQUAL, np.pi ,
+                name='second level constraint, primal theta upper bound ')
+            for w in range(self.data.Rival_scenarios.shape[1])  # Assuming you have a list of generators
+            for h in self.data.hour        # Iterating over hours
+            for n in self.data.nodes       # Iterating over nodes
+        }
+        
+############# set theta=0 at the reference node!!!!! ###############
     
     
 
@@ -704,15 +875,14 @@ if __name__ == "__main__":
         system_demand=dict(zip(Wind_PF_data["Hour"].tolist(),Demand_profile["System demand (MW)"].tolist())),  
         technology_type=Investment_data["Technology"].tolist(),
         investment_cost=dict(zip(Investment_data["Technology"].tolist(),Investment_data["Inv. Cost ($/MW)"].tolist())),
-        max_investment_capacity=dict(zip(Investment_data["Technology"].tolist(),Investment_data["Max Inv. Capacity (MW)"].tolist()))
-        omega_node_set=Omega_n_sets
+        max_investment_capacity=dict(zip(Investment_data["Technology"].tolist(),Investment_data["Max Inv. Capacity (MW)"].tolist())),
+        omega_node_set=Omega_n_sets,
         
-        model = EconomicDispatch(input_data, complementarity_method='SOS1')
+        model = EconomicDispatch(input_data, complementarity_method='SOS1'),
         
-        model.run()
+        model.run().
         model.display_results()
         
-        
-    )
+        )
 
 
