@@ -191,3 +191,8 @@ susceptance_matrix = create_susceptance_matrix(data=[
 capacity_matrix = create_capacity_matrix(lines_data)
 # print("\nCapacity Matrix:")
 # print(capacity_matrix)
+
+#RISK
+
+beta=1
+alpha=0.5

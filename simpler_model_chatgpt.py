@@ -19,7 +19,9 @@ from data_gpt import (
     Df_rival,
     Omega_n_sets,
     capacity_matrix,
-    susceptance_matrix
+    susceptance_matrix,
+    alpha,
+    beta,
 )
 
 nodes = list(range(1, 25))
@@ -50,6 +52,8 @@ class InputData:
         omega_node_set: dict[int, list],
         capacity_matrix: pd.DataFrame,
         matrix_B: pd.DataFrame,
+        beta: float,
+        alpha: float,
     ):
         self.investor_generation_data = investor_generation_data
         self.rival_generation_data = rival_generation_data
@@ -66,10 +70,12 @@ class InputData:
         self.omega_node_set = omega_node_set
         self.capacity_matrix = capacity_matrix
         self.matrix_B = matrix_B
+        self.beta=beta
+        self.alpha=alpha
 
 
 class Optimal_Investment:
-    def __init__(self, input_data: InputData, complementarity_method: str = 'SOS1'):
+    def __init__(self, input_data: InputData,complementarity_method: str = 'SOS1'):
         self.data = input_data  # Reference to the InputData instance
         #self.complementarity_method = complementarity_method  # Complementarity method
         self.variables = Expando()  # Container for decision variables
@@ -243,9 +249,25 @@ class Optimal_Investment:
             )
             for n in range(1, 25)
         }
+        
+        # Risk-related variables
+        self.variables.zeta = self.model.addVar(
+            lb=0,
+            ub=GRB.INFINITY,
+            name="zeta"
+        )
+        
+        self.variables.eta = {
+            k: self.model.addVar(
+                lb=0,
+                ub=GRB.INFINITY,
+                name=f"eta_scenario_{k}"
+            )
+            for k in self.data.demand_scenarios.columns  # One eta for each scenario
+        }
 
     def _build_upper_level_constraint(self):
-        K = 1.6e10 # budget 
+        K = 1.6e9 # budget 
         # Maximum capacity investment for conventional units at each node
         self.constraints.upper_level_max_inv_conv = {
             n: self.model.addConstr(
@@ -445,6 +467,39 @@ class Optimal_Investment:
             for h in range(1, 25)  # Iterate over 24 hours
             for n in [1]
         }
+        
+        #RISK
+        # Profit calculation for each scenario
+        for k in self.data.demand_scenarios.columns:
+            profit_k = (
+                gp.quicksum(
+                    20 * 365 * self.data.DA_prices.iloc[h - 1]["DA_prices"] * 1000 * (
+                        self.variables.prod_new_conv_unit[(k, h, n)] +
+                        (self.variables.prod_existing_conv[(k, h, n)]
+                         if n in self.data.investor_generation_data["Node"].values else 0) +
+                        self.variables.prod_PV[(k, h, n)] +
+                        self.variables.prod_wind[(k, h, n)]
+                    )
+                    - (
+                        self.variables.prod_new_conv_unit[(k, h, n)] * cand_Conv_cost +
+                        (self.variables.prod_existing_conv[(k, h, n)] * investor_generation_data.iloc[0, 1]
+                         if n in self.data.investor_generation_data["Node"].values else 0)
+                    )
+                    for h in range(1, 25)
+                    for n in range(1, 25)
+                )
+            )
+            # Constraint: eta^(k) >= zeta - Profit_k
+            setattr(
+                self.constraints, 
+                f"eta_constraint_{k}", 
+                self.model.addConstr(
+                    self.variables.eta[k] >= self.variables.zeta - profit_k,
+                    name=f"eta_ge_zeta_minus_profit_scenario_{k}"
+                )
+            )
+
+
 
 
 
@@ -464,7 +519,7 @@ class Optimal_Investment:
 
         #print("prod_new_conv_unit",self.variables.prod_new_conv_unit)
         #print("prod_existing_conv",self.variables.prod_existing_conv)
-        production_revenue = gp.quicksum(
+        production_revenue = 20*365*gp.quicksum(
             probability_scenario[int(w[-1]) - 1] *  # Extract scenario number (0-indexed)
             self.data.DA_prices.iloc[h - 1]["DA_prices"] *1000* (  # Adjust h for 0-indexed DA_prices
                 self.variables.prod_new_conv_unit[(w, h, n)] +
@@ -479,7 +534,7 @@ class Optimal_Investment:
             - (
                 self.variables.prod_new_conv_unit[(w, h, n)] * cand_Conv_cost  # Subtracting investment cost for new conventional units
                 + (
-                    self.variables.prod_existing_conv[(w, h, n)] * investment_data.iloc[0, 3]
+                    self.variables.prod_existing_conv[(w, h, n)] * investor_generation_data.iloc[0, 1]
                     if n in self.data.investor_generation_data["Node"].values
                     else 0  # Skip cost if there is no existing generator at node n
                 )
@@ -488,10 +543,25 @@ class Optimal_Investment:
         
 
 
+#         # Risk parameters
+# beta = 0.5  # Adjust beta based on your preference
+# alpha = 0.05  # Confidence level for the risk measure
+
+        # Add risk measure to the objective
+        risk_term = self.variables.zeta + (1 / (1 - alpha)) * gp.quicksum(
+            probability_scenario[int(k[-1]) - 1] * self.variables.eta[k]
+            for k in self.data.demand_scenarios.columns
+        )
+
+        # Update objective function
+        self.model.setObjective(
+            investment_cost - production_revenue + beta * risk_term,
+            GRB.MINIMIZE
+        )
 
     
-        # Set the objective as the minimization of total cost
-        self.model.setObjective(investment_cost - production_revenue, GRB.MINIMIZE)
+        # # Set the objective as the minimization of total cost
+        # self.model.setObjective(investment_cost - production_revenue, GRB.MINIMIZE)
         
     def run(self):
        self.model.optimize()
@@ -614,6 +684,8 @@ def prepare_input_data():
         omega_node_set=Omega_n_sets,
         capacity_matrix=capacity_matrix,
         matrix_B=susceptance_matrix,
+        beta=beta,
+        alpha=alpha
     )
 
 if __name__ == "__main__":
