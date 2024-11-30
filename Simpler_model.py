@@ -583,7 +583,3 @@ if __name__ == "__main__":
     model.run()
     model.display_results()
 
-
-        #omega_node_set=dict(zip(omega_node_set["Hour"].tolist(), omega_node_set["Price"].tolist())),
-        
-        #DA_prices_data = DA_prices_data.iloc[:, 1].tolist() 
