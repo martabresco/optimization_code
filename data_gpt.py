@@ -97,10 +97,10 @@ def create_capacity_matrix(lines_data):
 
 
 Df_demand, Df_rival = scenarios_creation()
-print("Demand Scenarios:")
-print(Df_demand)
-print("\nRival Scenarios:")
-print(Df_rival)
+# print("Demand Scenarios:")
+# print(Df_demand)
+# print("\nRival Scenarios:")
+# print(Df_rival)
 
 # Données des générateurs
 investor_generation_data = load_generation_data("Generation Data.xlsx", "Generation_investor")
@@ -185,9 +185,9 @@ susceptance_matrix = create_susceptance_matrix(data=[
     (32, 'L33', 20, 23, 0.0112, 1000),
     (33, 'L34', 21, 22, 0.0692, 500)
 ], num_nodes=24)
-print("\nSusceptance Matrix:")
-print(susceptance_matrix)
+# print("\nSusceptance Matrix:")
+# print(susceptance_matrix)
 
 capacity_matrix = create_capacity_matrix(lines_data)
-print("\nCapacity Matrix:")
-print(capacity_matrix)
+# print("\nCapacity Matrix:")
+# print(capacity_matrix)
