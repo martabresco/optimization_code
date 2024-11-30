@@ -445,19 +445,39 @@ class InputData: #Idea: create one class for Input variables and one class for t
             for h in range(self.data.hour)  # Iterate over all hours
             }
         
-        
-        ##### Need to fix the last one for the existing generation costs. 
-    def _build_objective_function(self):
-       probability_scenario = [0.4 for _ in range(16)] ##### must be canged to the ones for each scenario!!
-        objective = (
-            quicksum(Investment_data.iloc[0,1]*self.variables.cap_invest_conv(n) for n in self.data.nodes)
-            + Investment_data.iloc[1,1]*self.variables.PV_invest_bin(n)
-            +Investment_data.iloc[2,1]*self.variables.wind_invest_bin(n)
-            -quicksum(probability_scenario(w)* quicksum(DA_prices(h)*quicksum(self.variables.prod_new_conv_unit(n,w,h)
-            +self.variables.prod_existing_conv(n,w,h)+self.variables.prod_PV(n,w,h)+self.variables.prod_wind(n,w,h)
-            -self.variables.prod_new_conv_unit(n,w,t)*Investment_data.iloc[0,1]-self.variables.prod_existing_conv(n,w,h)*investor_generation_data.iloc[:,3]))
-        )
-        self.model.setObjective(objective, GRB.MINIMIZE)
+        def _build_objective_function(self):
+            # Assuming 'probability_scenario' is meant to be a list of probabilities for each scenario
+            probability_scenario = [0.4 for _ in range(16)]  # This should be updated based on the actual scenario probabilities
+    
+            objective = (
+            # Investment costs
+                quicksum(Investment_data.iloc[0, 1] * self.variables.cap_invest_conv(n) for n in self.data.nodes) +
+                quicksum(Investment_data.iloc[1, 1] * self.variables.PV_invest_bin(n) for n in self.data.nodes) +
+                quicksum(Investment_data.iloc[2, 1] * self.variables.wind_invest_bin(n) for n in self.data.nodes) +
+
+                # Revenue terms (from production, based on scenario and hour)
+                - quicksum(
+                    probability_scenario[w] *  # For each scenario, multiply by the probability
+                    quicksum(
+                        DA_prices(h) * quicksum(
+                            # Summing production values across all nodes for each hour
+                            self.variables.prod_new_conv_unit(n, w, h) +
+                            self.variables.prod_existing_conv(n, w, h) +
+                            self.variables.prod_PV(n, w, h) +
+                            self.variables.prod_wind(n, w, h)
+                            - self.variables.prod_new_conv_unit(n, w, h) * Investment_data.iloc[0, 1]  # Subtracting investment cost for new conventional units
+                            - self.variables.prod_existing_conv(n, w, h) * investor_generation_data.iloc[:, 3]  # Subtracting cost for existing conventional units (cost in the 4th column of `investor_generation_data`)
+                            for n in self.data.nodes  # Summing over all nodes
+                            )
+                        for h in range(self.data.hour)  # Iterate over all hours
+                        )
+                    for w in range(self.data.Rival_scenarios.shape[1])  # Iterate over all scenarios
+                ))
+            self.model.setObjective(objective, GRB.MINIMIZE)
+
+
+
+
 
     def _build_model(self):
         self.model = gp.Model(name='Bilevel offering strategy')
