@@ -17,6 +17,7 @@ from Data import Demand_scenarios
 from Data import Omega_n_sets
 from Data import matrix_B
 from Data import capacity_matrix
+from Data import probability_scenario
 
 nodes = list(range(1, 25))
 K = 1.6e9  #in dollars, max investment budget
@@ -885,6 +886,64 @@ class Optimal_Investment():
            }
         
         # create SOS1 conditions 
+       self.constraints.sos1_max_production_conv = {
+         (w,h,n): self.model.addSOS(
+                 GRB.SOS_TYPE1, [self.variables.complementarity_max_conv_inv_auxiliary[w][h][n], self.variables.max_mu_conv_inv[w][h][n]]
+             )
+             for w in range(self.data.Rival_scenarios.shape[1])  # Assuming you have a list of generators
+             for h in self.data.hour        # Iterating over hours
+             for n in self.data.nodes       # Iterating over nodes
+         }
+       self.constraints.sos1_max_production_PV = {
+         (w,h,n): self.model.addSOS(
+                 GRB.SOS_TYPE1, [self.variables.complementarity_max_PV_inv_auxiliary[w][h][n], self.variables.max_sigma_PV[w][h][n]]
+             )
+             for w in range(self.data.Rival_scenarios.shape[1])  # Assuming you have a list of generators
+             for h in self.data.hour        # Iterating over hours
+             for n in self.data.nodes       # Iterating over nodes
+         }
+       self.constraints.sos1_max_production_wind = {
+         (w,h,n): self.model.addSOS(
+                 GRB.SOS_TYPE1, [self.variables.complementarity_max_wind_inv_auxiliary[w][h][n], self.variables.max_sigma_wind[w][h][n]]
+             )
+             for w in range(self.data.Rival_scenarios.shape[1])  # Assuming you have a list of generators
+             for h in self.data.hour        # Iterating over hours
+             for n in self.data.nodes       # Iterating over nodes
+         }
+       self.constraints.sos1_max_production_max_conv_existing = {
+         (w,h,n): self.model.addSOS(
+                 GRB.SOS_TYPE1, [self.variables.complementarity_max_conv_existing_auxiliary[w][h][n], self.variables.max_mu_existing[w][h][n]]
+             )
+             for w in range(self.data.Rival_scenarios.shape[1])  # Assuming you have a list of generators
+             for h in self.data.hour        # Iterating over hours
+             for n in self.data.nodes       # Iterating over nodes
+         }
+       self.constraints.sos1_max_production_max_rival_existing = {
+         (w,h,n): self.model.addSOS(
+                 GRB.SOS_TYPE1, [self.variables.complementarity_max_rival_existing_auxiliary[w][h][n], self.variables.max_mu_rival[w][h][n]]
+             )
+             for w in range(self.data.Rival_scenarios.shape[1])  # Assuming you have a list of generators
+             for h in self.data.hour        # Iterating over hours
+             for n in self.data.nodes       # Iterating over nodes
+         }
+       self.constraints.sos1_max_production_max_rival_new = {
+         (w,h,n): self.model.addSOS(
+                 GRB.SOS_TYPE1, [self.variables.complementarity_max_rival_new_auxiliary[w][h][n], self.variables.max_mu_rival_new[w][h][n]]
+             )
+             for w in range(self.data.Rival_scenarios.shape[1])  # Assuming you have a list of generators
+             for h in self.data.hour        # Iterating over hours
+             for n in self.data.nodes       # Iterating over nodes
+         }
+        
+       self.constraints.sos1_max_production_theta_flow = {
+         (w,h,n): self.model.addSOS(
+                 GRB.SOS_TYPE1, [self.variables.gamma_f[w][h][n], (matrix_B[n,m] *(self.variables.complementarity_max_theta_flow_auxiliary[w][h][n])-capacity_matrix[n,m] for m in self.data.nodes)]
+             )
+             for w in range(self.data.Rival_scenarios.shape[1])  # Assuming you have a list of generators
+             for h in self.data.hour        # Iterating over hours
+             for n in self.data.nodes       # Iterating over nodes
+         }
+        
        self.constraints.sos1_min_production_conv = {
         (w,h,n): self.model.addSOS(
                 GRB.SOS_TYPE1, [self.variables.min_mu_conv_inv[w][h][n] , self.variables.prod_new_conv_unit[w][h][n]]
@@ -962,17 +1021,28 @@ class Optimal_Investment():
 
     def _build_objective_function(self):
         objective = (
-            - self.data.generator_cost['G1'] * self.variables.g1_production_DA 
-            - gp.quicksum(
-                self.data.generator_cost[g] * self.variables.generator_production[g] 
-                + self.data.generator_capacity[g] * self.variables.max_production_dual[g]
-                for g in self.data.GENERATORS if g != 'G1'
-            )
-            + gp.quicksum(
-                self.data.load_utility[d] * self.variables.load_consumption[d]
-                - self.data.load_capacity[d] * self.variables.max_consumption_dual[d]
-                for d in self.data.LOADS
-            )
+            GRB.quicksum(Investment_data.iloc[0, 1] * self.variables.cap_invest_conv[n] for n in self.data.nodes) +
+            GRB.quicksum(Investment_data.iloc[1, 1] * self.variables.cap_invest_PV[n] for n in self.data.nodes) +
+            GRB.quicksum(Investment_data.iloc[2, 1] * self.variables.cap_invest_Wind[n] for n in self.data.nodes) +
+            
+            - GRB.quicksum(
+                probability_scenario[w] *  # For each scenario, multiply by the probability
+                GRB.quicksum(GRB.quicksum(
+                    self.variables.lambda_dual[w][h][n]*
+                        # Summing production values across all nodes for each hour
+                        (self.variables.prod_new_conv_unit[w][h][n] +
+                        (self.variables.prod_existing_conv[w][h][n] if n == investor_generation_data["Node"]+1 else 0) +
+                        self.variables.prod_PV[w][h][n] +
+                        self.variables.prod_wind[w][h][n])
+                        - self.variables.prod_new_conv_unit[w][h][n] * cand_Conv_cost # Subtracting investment cost for new conventional units
+                        - (self.variables.prod_existing_conv[w][h][n] * investor_generation_data.iloc[investor_generation_data.index[investor_generation_data["Node"] == n+1].tolist(), 3] if n == investor_generation_data["Node"]+1 else 0) # Subtracting cost for existing conventional units (cost in the 4th column of investor_generation_data)
+                        )
+                        for n in self.data.nodes  # Summing over all nodes
+                        )
+                    for h in range(self.data.hour)  # Iterate over all hours
+                    )
+                for w in range(self.data.Rival_scenarios.shape[1])  # Iterate over all scenarios
+            
         )
         self.model.setObjective(objective, GRB.MAXIMIZE)
 
@@ -1007,7 +1077,7 @@ class Optimal_Investment():
         if self.model.status == GRB.OPTIMAL:
             self._save_results()
         else:
-            raise RuntimeError(f"optimization of {model.ModelName} was not successful")
+            raise RuntimeError(f"optimization was not successful")
     
     def display_results(self):
         print()

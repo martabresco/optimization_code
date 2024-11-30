@@ -218,5 +218,8 @@ capacity_matrix = pd.DataFrame(capacity_matrix, index=range(1, num_nodes + 1), c
 print(capacity_matrix)
 
 
+probability_scenario=[0.06,0.06,0.06,0.02,0.06,0.06,0.06,0.02,0.09,0.09,0.09,0.03,0.09,0.09,0.09,0.03]
+
+
 
 
