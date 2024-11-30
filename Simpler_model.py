@@ -210,6 +210,7 @@ class Optimal_Investment():
             }
 
         
+        # from upper level
         self.variables.cap_invest_conv = {
             n: self.model.addVar(
             lb=0,
