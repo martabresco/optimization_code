@@ -28,40 +28,91 @@ class Expando(object):
     pass
 
 
-class InputData:
+class InputData: #Idea: create one class for Input variables and one class for the optimization itself
+    
     def __init__(
-        self,
-        investor_generation_data: pd.DataFrame,
-        rival_generation_data: pd.DataFrame,
-        lines_data: pd.DataFrame,
-        wind_PF_data: pd.DataFrame,
-        PV_PF_data: pd.DataFrame,
-        demand_profile: pd.DataFrame,
-        demand_distribution: pd.DataFrame,
-        demand_prices: pd.DataFrame,
-        investment_data: pd.DataFrame,
-        DA_prices: pd.DataFrame,
-        demand_scenarios: pd.DataFrame,
-        rival_scenarios: pd.DataFrame,
-        omega_node_set: dict[int, list],
-        capacity_matrix: pd.DataFrame,
-        matrix_B: pd.DataFrame,
+        self, 
+        #existing investor generators data
+        existing_investor_generator_id: list, #list with the number of each unit
+        existing_investor_generator_node:dict[str,int],
+        existing_investor_generator_capacity: dict[str, int],
+        existing_investor_generator_cost: dict[str, int],     
+        
+        #existing rival generators data
+        existing_rival_generator_id: list, #list with the number of each unit
+        existing_rival_generator_node:dict[str,int],
+        existing_rival_generator_capacity: dict[str, int],
+        existing_rival_generator_cost: dict[str, int],
+
+        #line data
+        line_id:list,
+        line_from:dict[str,int],
+        line_to:dict[str,int],
+        line_X:dict[str,int],
+        line_capacity:dict[str,int],
+
+        #Wind power factor
+        hour:list,
+        wind_PF: dict[str,int],
+        
+        #PV power factor
+        PV_PF: dict[str,int],
+        
+        #Demand distribution
+        demand_id: list,
+        demand_node:dict[str,int],
+        fraction_system_load:dict[str,int],
+        
+        #Demand price
+        demand_price: dict[str,int],
+        #Demand profile
+        system_demand:dict[str,int],
+        
+        #Investment data
+        technology_type:list,
+        investment_cost:dict[str,int],
+        max_investment_capacity:dict[str,int],
+        omega_node_set:dict[int,list],
+        
+        #Day-ahead price
+        DA_price: dict[int,list]
+        
+        #Doubt: do I also need to import demand scenarios and Rival scenarios as an attribute?
+        
+
     ):
-        self.investor_generation_data = investor_generation_data
-        self.rival_generation_data = rival_generation_data
-        self.lines_data = lines_data
-        self.wind_PF_data = wind_PF_data
-        self.PV_PF_data = PV_PF_data
-        self.demand_profile = demand_profile
-        self.demand_distribution = demand_distribution
-        self.demand_prices = demand_prices
-        self.investment_data = investment_data
-        self.DA_prices = DA_prices
-        self.demand_scenarios = demand_scenarios
-        self.rival_scenarios = rival_scenarios
+        # List of existing generators 
+        self.existing_investor_generator_id = existing_investor_generator_id
+        #Dictionary with connection node of each existing generator
+        self.existing_investor_generator_node = existing_investor_generator_node
+        #Dictionary with capacity of each existing generator
+        self.existing_investor_generator_capacity = existing_investor_generator_capacity
+        # Dictionary with each cost of existing geenrator
+        self.existing_investor_generator_cost = existing_investor_generator_cost 
+        self.existing_rival_generator_id = existing_rival_generator_id
+        #Dictionary with connection node of each existing generator
+        self.existing_rival_generator_node = existing_rival_generator_node
+        #Dictionary with capacity of each existing generator
+        self.existing_rival_generator_capacity = existing_rival_generator_capacity
+        # Dictionary with each cost of existing geenrator
+        self.existing_rival_generator_cost = existing_rival_generator_cost      
+        self.line_id=line_id
+        self.line_from=line_from
+        self.line_to=line_to
+        self.line_X=line_X
+        self.line_capacity=line_capacity
+        self.hour=hour
+        self.PV_PF=PV_PF
+        self.demand_id=demand_id
+        self.demand_node=demand_node
+        self.fraction_system_load=fraction_system_load
+        self.demand_price=demand_price
+        self.system_demand=system_demand
+        self.technology_type=technology_type
+        self.investment_cost=investment_cost
+        self.max_investment_capacity=max_investment_capacity
         self.omega_node_set = omega_node_set
-        self.capacity_matrix = capacity_matrix
-        self.matrix_B = matrix_B
+        self.DA_price = DA_price
 
 
 class Optimal_Investment():
@@ -394,19 +445,39 @@ class Optimal_Investment():
             for h in range(self.data.hour)  # Iterate over all hours
             }
         
-        
-        ##### Need to fix the last one for the existing generation costs. 
-    def _build_objective_function(self):
-       probability_scenario = [0.4 for _ in range(16)] ##### must be canged to the ones for each scenario!!
-        objective = (
-            quicksum(Investment_data.iloc[0,1]*self.variables.cap_invest_conv(n) for n in self.data.nodes)
-            + Investment_data.iloc[1,1]*self.variables.PV_invest_bin(n)
-            +Investment_data.iloc[2,1]*self.variables.wind_invest_bin(n)
-            -quicksum(probability_scenario(w)* quicksum(DA_prices(h)*quicksum(self.variables.prod_new_conv_unit(n,w,h)
-            +self.variables.prod_existing_conv(n,w,h)+self.variables.prod_PV(n,w,h)+self.variables.prod_wind(n,w,h)
-            -self.variables.prod_new_conv_unit(n,w,t)*Investment_data.iloc[0,1]-self.variables.prod_existing_conv(n,w,h)*investor_generation_data.iloc[:,3]))
-        )
-        self.model.setObjective(objective, GRB.MINIMIZE)
+        def _build_objective_function(self):
+            # Assuming 'probability_scenario' is meant to be a list of probabilities for each scenario
+            probability_scenario = [0.4 for _ in range(16)]  # This should be updated based on the actual scenario probabilities
+    
+            objective = (
+            # Investment costs
+                quicksum(Investment_data.iloc[0, 1] * self.variables.cap_invest_conv(n) for n in self.data.nodes) +
+                quicksum(Investment_data.iloc[1, 1] * self.variables.PV_invest_bin(n) for n in self.data.nodes) +
+                quicksum(Investment_data.iloc[2, 1] * self.variables.wind_invest_bin(n) for n in self.data.nodes) +
+
+                # Revenue terms (from production, based on scenario and hour)
+                - quicksum(
+                    probability_scenario[w] *  # For each scenario, multiply by the probability
+                    quicksum(
+                        DA_prices(h) * quicksum(
+                            # Summing production values across all nodes for each hour
+                            self.variables.prod_new_conv_unit(n, w, h) +
+                            self.variables.prod_existing_conv(n, w, h) +
+                            self.variables.prod_PV(n, w, h) +
+                            self.variables.prod_wind(n, w, h)
+                            - self.variables.prod_new_conv_unit(n, w, h) * Investment_data.iloc[0, 1]  # Subtracting investment cost for new conventional units
+                            - self.variables.prod_existing_conv(n, w, h) * investor_generation_data.iloc[:, 3]  # Subtracting cost for existing conventional units (cost in the 4th column of `investor_generation_data`)
+                            for n in self.data.nodes  # Summing over all nodes
+                            )
+                        for h in range(self.data.hour)  # Iterate over all hours
+                        )
+                    for w in range(self.data.Rival_scenarios.shape[1])  # Iterate over all scenarios
+                ))
+            self.model.setObjective(objective, GRB.MINIMIZE)
+
+
+
+
 
     def _build_model(self):
         self.model = gp.Model(name='Bilevel offering strategy')
