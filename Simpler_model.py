@@ -559,7 +559,7 @@ if __name__ == "__main__":
         technology_type=Investment_data["Technology"].tolist(),
         investment_cost=dict(zip(Investment_data["Technology"].tolist(),Investment_data["Inv. Cost ($/MW)"].tolist())),
         max_investment_capacity=dict(zip(Investment_data["Technology"].tolist(),Investment_data["Max Inv. Capacity (MW)"].tolist())),
-        #omega_node_set=Omega_n_sets
+        omega_node_set=dict(zip(omega_node_set["Hour"].tolist(), omega_node_set["Price"].tolist())) ,
         
         DA_price=dict(zip(Wind_PF_data["Hour"].tolist(), DA_price["Price"].tolist()))  
         
