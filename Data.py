@@ -3,7 +3,7 @@ from itertools import product
 import random
 import matplotlib.pyplot as plt
 import numpy as np
-
+import math as m
 #Scenario Creation
 
 def scenarios_creation():
@@ -55,57 +55,56 @@ def scenarios_creation():
 file_path1 = "Generation Data.xlsx"  # you need to have this file in your working directory
 investor_generation_data = pd.read_excel(file_path1, sheet_name = "Generation_investor")
 pd.set_option('display.max_rows', None)
-print(investor_generation_data)
+#print(investor_generation_data)
 
 #load generation data from rival
 file_path1 = "Generation Data.xlsx"  # you need to have this file in your working directory
 rival_generation_data = pd.read_excel(file_path1, sheet_name = "Generation_rival")
 pd.set_option('display.max_rows', None)
-print(rival_generation_data)
+#print(rival_generation_data)
 
 # Lines Generation Data
 file_path2 = "Lines_Data.xlsx"  # you need to have this file in your working directory
 lines_data = pd.read_excel(file_path2) 
-print(lines_data)
+#print(lines_data)
 
 # Power Capacity Factor for Wind Data
 file_path3 = "Wind_PowerFactor_AverageDay.xlsx"  # you need to have this file in your working directory
 Wind_PF_data = pd.read_excel(file_path3) # normalized wrt the max output during the year
-print(Wind_PF_data)
+#print(Wind_PF_data)
 
 # Power Capacity Factor for PV Data
 file_path4 = "PV_PowerFactor_AverageDay.xlsx"  # you need to have this file in your working directory
 PV_PF_data = pd.read_excel(file_path4) # normalized wrt the max output during the year
-print(PV_PF_data)
+#print(PV_PF_data)
 
 #Load profile data (base load for each representative hour)
 file_path5 = "Load dataset.xlsx"  # you need to have this file in your working directory
 Demand_profile = pd.read_excel(file_path5, sheet_name = "Load profile") #In MW for each hour
-print(Demand_profile)
+#print(Demand_profile)
 
 #Load distribution data (base load for each representative hour)
 Demand_distribution = pd.read_excel(file_path5, sheet_name = "Load distribution") #in % of system load
-print(Demand_distribution)
+#print(Demand_distribution)
 
 #Demand prices (Utility of demand) for each representative hour. It is not dependent on the node 
 Demand_prices = pd.read_excel(file_path5, sheet_name = "Demand prices") # in $/MWh
-print(Demand_prices)
+#print(Demand_prices)
 
 #Investment costs and capacities
 file_path6="Investment.xlsx"
 Investment_data=pd.read_excel(file_path6)
-print(Investment_data)
+#print(Investment_data)
 
-
-#Day-ahead pirces, simpler model 
-file_path7="DA_prices.xlsx" 
-DA_prices = pd.read_excel(file_path7, usecols=[1]) # in $/MWh
-print("Day-ahead",DA_prices)
+#Investment costs and capacities
+file_path7="DA_prices.xlsx"
+DA_prices_data=pd.read_excel(file_path7)
+#print(DA_prices_data)
 
 Demand_scenarios, Rival_scenarios=scenarios_creation()
 
-print("Demand", Demand_scenarios)
-print("Rival", Rival_scenarios)
+#print("Demand", Demand_scenarios)
+#print("Rival", Rival_scenarios)
 
 Omega_n_sets = {
     1: [2,3,5],
@@ -133,6 +132,96 @@ Omega_n_sets = {
     23: [12,13,20],
     24: [3,15],
 }
+
+data = [
+    (0, 'L1', 1, 2, 0.0146, 175),
+    (1, 'L2', 1, 3, 0.2253, 175),
+    (2, 'L3', 1, 5, 0.0907, 350),
+    (3, 'L4', 2, 4, 0.1356, 175),
+    (4, 'L5', 2, 6, 0.205, 175),
+    (5, 'L6', 3, 9, 0.1271, 175),
+    (6, 'L7', 3, 24, 0.084, 400),
+    (7, 'L8', 4, 9, 0.111, 175),
+    (8, 'L9', 5, 10, 0.094, 350),
+    (9, 'L10', 6, 10, 0.0642, 175),
+    (10, 'L11', 7, 8, 0.0652, 350),
+    (11, 'L12', 8, 9, 0.1762, 175),
+    (12, 'L13', 8, 10, 0.1762, 175),
+    (13, 'L14', 9, 11, 0.084, 400),
+    (14, 'L15', 9, 12, 0.084, 400),
+    (15, 'L16', 10, 11, 0.084, 400),
+    (16, 'L17', 10, 12, 0.084, 400),
+    (17, 'L18', 11, 13, 0.0488, 500),
+    (18, 'L19', 11, 14, 0.0426, 500),
+    (19, 'L20', 12, 13, 0.0488, 500),
+    (20, 'L21', 12, 23, 0.0985, 500),
+    (21, 'L22', 13, 23, 0.0884, 500),
+    (22, 'L23', 14, 16, 0.0594, 500),
+    (23, 'L24', 15, 16, 0.0172, 500),
+    (24, 'L25', 15, 21, 0.0249, 1000),
+    (25, 'L26', 15, 24, 0.0529, 500),
+    (26, 'L27', 16, 17, 0.0263, 500),
+    (27, 'L28', 16, 19, 0.0234, 500),
+    (28, 'L29', 17, 18, 0.0143, 500),
+    (29, 'L30', 17, 22, 0.1069, 500),
+    (30, 'L31', 18, 21, 0.0132, 1000),
+    (31, 'L32', 19, 20, 0.0203, 1000),
+    (32, 'L33', 20, 23, 0.0112, 1000),
+    (33, 'L34', 21, 22, 0.0692, 500)
+]
+
+num_nodes=24
+matrix = np.zeros((num_nodes, num_nodes))
+
+for _, _, from_node, to_node, x, _ in data:
+    from_idx = from_node - 1  # Adjusting for 0-based indexing
+    to_idx = to_node - 1
+    value = 1 / x if x != 0 else 0  # Avoid division by zero
+    matrix[from_idx, to_idx] = value
+    matrix[to_idx, from_idx] = value  # Ensure symmetry
+
+
+# Convert to a DataFrame for better readability
+matrix_df = pd.DataFrame(matrix, index=range(1, num_nodes + 1), columns=range(1, num_nodes + 1))
+matrix_df
+
+
+
+# Populate the matrix with 1/X values for each line connection
+
+for _, _, from_node, to_node, x, _ in data:
+    from_idx = from_node - 1  # Adjusting for 0-based indexing
+    to_idx = to_node - 1
+    value = 1 / x if x != 0 else 0  # Avoid division by zero
+    matrix[from_idx, to_idx] = value
+    matrix[to_idx, from_idx] = value  # Ensure symmetry
+
+
+# Convert to a DataFrame for better readability
+matrix_B = pd.DataFrame(matrix, index=range(1, num_nodes + 1), columns=range(1, num_nodes + 1))
+matrix_B
+
+
+df = lines_data
+
+# Determine the number of nodes
+num_nodes = max(df["From"].max(), df["To"].max())
+
+# Initialize an n x n matrix with zeros
+capacity_matrix = np.zeros((num_nodes, num_nodes))
+
+# Populate the matrix with capacities
+for _, row in df.iterrows():
+    m, n, capacity = int(row["From"]), int(row["To"]), row["Capacity (MVA)"]
+    capacity_matrix[m - 1, n - 1] = capacity  # Adjusting for 0-based indexing
+    capacity_matrix[n - 1, m - 1] = capacity  # Assuming undirected graph
+
+# Convert to DataFrame for better visualization (optional)
+capacity_matrix = pd.DataFrame(capacity_matrix, index=range(1, num_nodes + 1), columns=range(1, num_nodes + 1))
+
+# Print or return the matrix
+#print(capacity_matrix)
+
 
 
 

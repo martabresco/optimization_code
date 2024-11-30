@@ -1,7 +1,8 @@
-import gurobipy as gp
+import gurobipy as grb
 from gurobipy import GRB
-import pandas as pd
-import math as m
+#import pandas as pd
+import math as math
+from gurobipy import quicksum
 
 from Data import investor_generation_data
 from Data import rival_generation_data
@@ -14,8 +15,10 @@ from Data import Demand_prices
 from Data import Investment_data
 from Data import Rival_scenarios
 from Data import Demand_scenarios
-from Data import Omega_n_sets
-from Data import DA_price
+#from Data import Omega_n_sets
+from Data import matrix_B
+from Data import capacity_matrix
+from Data import DA_prices_data
 
 nodes = list(range(1, 25))
 K = 1.6e9  #in dollars, max investment budget
@@ -72,10 +75,9 @@ class InputData: #Idea: create one class for Input variables and one class for t
         technology_type:list,
         investment_cost:dict[str,int],
         max_investment_capacity:dict[str,int],
-        omega_node_set:dict[int,list],
         
         #Day-ahead price
-        DA_price: dict[int,list]
+        DA_price_data: dict[int,list]
         
         #Doubt: do I also need to import demand scenarios and Rival scenarios as an attribute?
         
@@ -111,11 +113,10 @@ class InputData: #Idea: create one class for Input variables and one class for t
         self.technology_type=technology_type
         self.investment_cost=investment_cost
         self.max_investment_capacity=max_investment_capacity
-        self.omega_node_set = omega_node_set
-        self.DA_price = DA_price
+        self.DA_price_data = DA_price_data
+        
 
-
-# class Optimal_Investment():
+class Optimal_Investment():
 
     def __init__(self, input_data: InputData, complementarity_method: str = 'SOS1'): # initialize class
         self.data = input_data # define data attributes
@@ -157,32 +158,30 @@ class InputData: #Idea: create one class for Input variables and one class for t
             for h in self.data.hour        # Iterating over hours
             for n in self.data.nodes       # Iterating over nodes
             }
-        self.variables.prod_existing_conv ={
-            (w, h, n,u): self.model.addVar(
-                lb=0, 
-                ub=investor_generation_data.iloc[u-1, 2], #maybe there is an error here
-                name=f'Electricity production of existing conventional investor from unit {u} at node {n}, scenario {w} and hour {h}'
-                )
-            for w in self.data.Rival_scenarios.shape[1]  # Assuming you have a list of generators
+        self.variables.prod_existing_conv = { 
+            (w, h, n): self.model.addVar(
+           lb=0, 
+           ub=GRB.INFINITY,
+           name=f'Electricity production of existing conventional investor at node {n}, scenario {w} and hour {h}'
+           )
+            for w in range(self.data.Rival_scenarios.shape[1])  # Iterating over scenarios
             for h in self.data.hour        # Iterating over hours
             for n in self.data.nodes       # Iterating over nodes
-            for u in self.data.existing_investor_generator_id
             }
         self.variables.prod_existing_rival={
-            (w,h,n,u): self.model.addVar(
+            (w,h,n): self.model.addVar(
                 lb=0,
-                ub=rival_generation_data.iloc[u-1, 2],
-                name = f'Electricity production of existing conventional from rival unit{u}, at node {n}, scenario {w} and hour {h}'
+                ub=GRB.INFINITY,
+                name = f'Electricity production of existing conventional from rival unit at node {n}, scenario {w} and hour {h}'
                 )#maybe there is an error here)
             for w in self.data.Rival_scenarios.shape[1] # Assuming you have a list of generators
             for h in self.data.hour        # Iterating over hours
             for n in self.data.nodes       # Iterating over nodes
-            for u in self.data.existing_rival_generator_id #iterating over units 
             }
         self.variables.prod_new_conv_rival={
             (w,h,n): self.model.addVar(
                 lb=0,
-                ub=Rival_scenarios.iloc[0,w], #maybe this is wrong
+                ub=GRB.INFINITY, 
                 name = f'Electricity production of new conventional from rival at node {n}, scenario {w} and hour {h}'
                 )#maybe there is an error here)
             for w in self.data.Rival_scenarios.shape[1]  # Assuming you have a list of generators
@@ -205,6 +204,9 @@ class InputData: #Idea: create one class for Input variables and one class for t
                 ub=math.pi,
                 name = f'Voltage angle at node {n}, scenario {w} and hour {h}'
                 )
+            for w in self.data.Rival_scenarios.shape[1]  # Assuming you have a list of generators
+            for h in self.data.hour        # Iterating over hours
+            for n in self.data.nodes       # Iterating over nodes
             }
 
         
@@ -233,22 +235,26 @@ class InputData: #Idea: create one class for Input variables and one class for t
             n: self.model.addVar(
                 vtype=grb.GRB.BINARY, 
                 name = f'Binary var, 1 if conventional investment in node {n}'
-                )}
+                )
+            for n in self.data.nodes  }
         self.variables.PV_invest_bin={
             n: self.model.addVar(
                 vtype=grb.GRB.BINARY, 
                 name = f'Binary var, 1 if PV investment in node {n}'
-                )}
+                )
+            for n in self.data.nodes  }
         self.variables.wind_invest_bin={
             n: self.model.addVar(
                 vtype=grb.GRB.BINARY, 
                 name = f'Binary var, 1 if wind investment in node {n}'
-                )}
+                )
+            for n in self.data.nodes  }
         self.variables.node_bin={
             n: self.model.addVar(
                 vtype=grb.GRB.BINARY, 
                 name = f'Binary var, 1 if any investment in node {n}'
-                )}
+                )
+            for n in self.data.nodes  }
         
         
 
@@ -260,7 +266,7 @@ class InputData: #Idea: create one class for Input variables and one class for t
     def _build_upper_level_constraint(self):
         self.constraints.upper_level_max_inv_conv = {
             n: self.model.addConstr(
-                self.variables.cap_invest_conv[n] == self.variables.node_bin * data.Investment_data.iloc[0,2],
+                self.variables.cap_invest_conv[n] == self.variables.node_bin * Investment_data.iloc[0,2],
                 name = 'Max capacity investment for conventionals in node {n}'.format(n))
             for n in self.data.nodes
             }
@@ -272,32 +278,33 @@ class InputData: #Idea: create one class for Input variables and one class for t
             for n in self.data.nodes
             }
         self.constraint.upper_level_only_invest_one_node= self.model.addConstr(
-            gp.quicksum(self.variables.node_bin[n] for n in self.data.nodes) <= 1,
+            grb.quicksum(self.variables.node_bin[n] for n in self.data.nodes) <= 1,
             name = 'Only invest in one node of the system')
         
         self.constraint_upper_level_max_inv_PV = {
             n: self.model.addContr(
-                self.variables.cap_invest_PV[n] <= self.variables.PV_invest_bin[n] * data.Investment_data.iloc[1,2],
+                self.variables.cap_invest_PV[n] <= self.variables.PV_invest_bin[n] * Investment_data.iloc[1,2],
                 name = 'Max capacity investment for PV in node {n}'.format(n))
             for n in self.data.nodes
                 }
         self.constraint_upper_level_max_inv_wind = {
             n: self.model.addContr(
-                self.variables.cap_invest_Wind[n] <= self.variables.wind_invest_bin[n] * data.Investment_data.iloc[2,2],
+                self.variables.cap_invest_Wind[n] <= self.variables.wind_invest_bin[n] * Investment_data.iloc[2,2],
                 name = 'Max capacity investment for wind in node {n}'.format(n))
             for n in self.data.nodes
                 }
         self.constraint.upper_level_max_investment_budget= self.model.addConstr(
-            gp.quicksum(Investment_data.iloc[0,1]*self.variables.cap_invest_conv[n]+
+            grb.quicksum(Investment_data.iloc[0,1]*self.variables.cap_invest_conv[n]+
                         Investment_data.iloc[1,1]*self.variables.cap_invest_PV[n]+
                         Investment_data.iloc[2,1]*self.variables.cap_invest_wind[n]  for n in self.data.nodes) <= K,
             name = 'Budget limit')
         
         
+        
         self.constraints.power_balance = {
             (w, h, n): self.model.addConstr(
                     self.variables.demand_consumed[w, h, n] +
-                    quicksum(1/line_X[n, m] * (self.variables.voltage_angle[w, h, n] - self.variables.voltage_angle[w, h, m])
+                    quicksum(matrix_B[n, m] * (self.variables.voltage_angle[w, h, n] - self.variables.voltage_angle[w, h, m])
                              for m in self.data.nodes if m != n) 
                     - self.variables.prod_new_conv_unit[w, h, n] 
                     - self.variables.prod_PV[w, h, n] 
@@ -342,26 +349,26 @@ class InputData: #Idea: create one class for Input variables and one class for t
         
         
         
-        ##### Pretty sure this is wrong   #### Need to figure out how to fix it regarding more than one generator per node and so on.. also see if the rival scenario is right
-        
+       
         self.constraints.production_limits_existing_con = {
             (w, h, n): self.model.addConstr(
-                0<=self.variables.prod_existing_conv[w,h,n,u]<=investor_generation_data.iloc[:,2], #might be wrong!! 
-                name = 'Production limits existing conventional unit {u} in node {n} scenario {w} at hour {h}'.format(u,n,w,h))
-            for w in range(self.data.Rival_scenarios.shape[1])  # Assuming you have a list of generators
-            for h in range(self.data.hour)        # Iterating over hours
-            for n in self.data.nodes             # Iterating over nodes
-            for u in self.data.existing_rival_generator_id  # Iterating over units
-            }      
+                0 <= self.variables.prod_existing_conv[w, h, n] <= investor_generation_data.iloc[
+               investor_generation_data.iloc[:, 1] == n, 2].values[0],  # Accessing the value in column 2
+                name='Production limits existing conventional unit in node {n} scenario {w} at hour {h}'.format(n=n, w=w, h=h)
+                )
+            for w in range(self.data.Rival_scenarios.shape[1])  # Iterating over scenarios
+            for h in range(self.data.hour)  # Iterating over hours
+            for n in self.data.nodes  # Iterating over nodes
+            }
+     
 
         self.constraints.production_limits_existing_rival = {
             (w, h, n): self.model.addConstr(
-                0<=self.variables.prod_existing_rival[w,h,n,u]<=rival_generation_data.iloc[:,2], #might be wrong!! 
-                name = 'Production limits existing rival unit {u} in node {n} scenario {w} at hour {h}'.format(u,n,w,h))
+                0<=self.variables.prod_existing_rival[w,h,n]<=rival_generation_data.iloc[rival_generation_data.iloc[:,1]==n,2],
+                name = 'Production limits existing rival unit  in node {n} scenario {w} at hour {h}'.format(n,w,h))
             for w in range(self.data.Rival_scenarios.shape[1])  # Assuming you have a list of generators
             for h in range(self.data.hour)        # Iterating over hours
             for n in self.data.nodes             # Iterating over nodes
-            for u in self.data.existing_rival_generator_id  # Iterating over units
             }
         
         self.constraints.production_limits_new_rival = {
@@ -374,7 +381,7 @@ class InputData: #Idea: create one class for Input variables and one class for t
             if n == 23  
             }
         
-        ##########################################
+        
         
         
         self.constraints.node_limits_new_rival = {
@@ -403,17 +410,17 @@ class InputData: #Idea: create one class for Input variables and one class for t
             }
         
         # Constraint for line power flows based on voltage angle differences and line reactance
-        self.constraints.line_power_flow = {
+        self.constraints.line_power_flow = { 
             (w, h, n, m): self.model.addConstr(
                 # Power flow is determined by the voltage angle difference and line reactance
-                1 / line_X[n, m] * (self.variables.voltage_angle[w, h, n] - self.variables.voltage_angle[w, h, m]) <=
-                lines_data[(lines_data.iloc[:, 1] == n) & (lines_data.iloc[:, 2] == m)].iloc[0, 3],  # Line capacity for (n, m)
+                matrix_B[n, m] * (self.variables.voltage_angle[w, h, n] - self.variables.voltage_angle[w, h, m]) <=
+                capacity_matrix[n - 1, m - 1],  # Capacity between node n and node m from capacity_matrix
                 name='Power flow on line {n}-{m}, scenario {w}, hour {h}'.format(n=n, m=m, w=w, h=h)
                 )
             for w in range(self.data.Rival_scenarios.shape[1])  # Iterate over all scenarios
             for h in range(self.data.hour)  # Iterate over all hours
             for n in self.data.nodes       # Iterate over all nodes
-            for m in self.data.nodes if m != n  # Iterate over all connected nodes
+            for m in self.data.nodes if m != n  # Iterate over all connected nodes (ensuring m != n)
             }
         
         
@@ -459,7 +466,7 @@ class InputData: #Idea: create one class for Input variables and one class for t
                 - quicksum(
                     probability_scenario[w] *  # For each scenario, multiply by the probability
                     quicksum(
-                        DA_prices(h) * quicksum(
+                        DA_prices_data(h) * quicksum(
                             # Summing production values across all nodes for each hour
                             self.variables.prod_new_conv_unit(n, w, h) +
                             self.variables.prod_existing_conv(n, w, h) +
@@ -480,7 +487,7 @@ class InputData: #Idea: create one class for Input variables and one class for t
 
 
     def _build_model(self):
-        self.model = gp.Model(name='Bilevel offering strategy')
+        self.model = grb.Model(name='Bilevel offering strategy')
         self._build_variables()
         self._build_upper_level_constraint()
         self._build_kkt_primal_constraints()
@@ -495,11 +502,11 @@ class InputData: #Idea: create one class for Input variables and one class for t
         # save generator dispatch values
         self.results.generator_production = {
             g: self.variables.generator_production[g].x for g in self.data.GENERATORS
-        }
+            }
         # save load consumption values
         self.results.load_consumption = {
             d: self.variables.load_consumption[d].x for d in self.data.LOADS
-        }
+            }
         # save price (i.e., dual variable of balance constraint)
         self.results.price = self.variables.balance_dual.x
         # save strategic day-ahead offer of generator G1
@@ -508,9 +515,9 @@ class InputData: #Idea: create one class for Input variables and one class for t
     def run(self):
         self.model.optimize()
         if self.model.status == GRB.OPTIMAL:
-            self._save_results()
+               self._save_results()
         else:
-            raise RuntimeError(f"optimization of {model.ModelName} was not successful")
+               raise RuntimeError(f"optimization of {model.ModelName} was not successful")
     
     def display_results(self):
         print()
@@ -530,7 +537,14 @@ class InputData: #Idea: create one class for Input variables and one class for t
 
 
 
+
+    
+    
 if __name__ == "__main__":
+    
+    DA_prices_data = DA_prices_data.iloc[:, 1].tolist()
+
+    # Sett opp inputdataene
     input_data = InputData(
         existing_investor_generator_id=investor_generation_data.iloc[:,0].tolist(),
         existing_investor_generator_node=dict(zip(investor_generation_data.iloc[:,0].tolist(),investor_generation_data.iloc[:,1].tolist())),
@@ -559,17 +573,17 @@ if __name__ == "__main__":
         technology_type=Investment_data["Technology"].tolist(),
         investment_cost=dict(zip(Investment_data["Technology"].tolist(),Investment_data["Inv. Cost ($/MW)"].tolist())),
         max_investment_capacity=dict(zip(Investment_data["Technology"].tolist(),Investment_data["Max Inv. Capacity (MW)"].tolist())),
-        omega_node_set=dict(zip(omega_node_set["Hour"].tolist(), omega_node_set["Price"].tolist())) ,
-        
-        DA_price=dict(zip(Wind_PF_data["Hour"].tolist(), DA_price["Price"].tolist()))  
-        
-        
-        model = EconomicDispatch(input_data, complementarity_method='SOS1')
-        
-        model.run()
-        model.display_results()
-        
-        
+        DA_price_data=DA_prices_data
+ 
     )
+    
+    # Nå kan vi bruke Optimal_Investment objektet
+    model = Optimal_Investment(input_data, complementarity_method='SOS1')
+    
+    model.run()
+    model.display_results()
 
 
+        #omega_node_set=dict(zip(omega_node_set["Hour"].tolist(), omega_node_set["Price"].tolist())),
+        
+        #DA_prices_data = DA_prices_data.iloc[:, 1].tolist() 
