@@ -23,7 +23,7 @@ from data_gpt import (
 )
 
 nodes = list(range(1, 25))
-K = 1.6e10  #in dollars, max investment budget
+K = 1.6e9  #in dollars, max investment budget
 cand_Conv_cost=7.24;
 
 class Expando(object):
@@ -78,7 +78,12 @@ class Optimal_Investment:
         self.model = gp.Model("OptimalInvestment")  # Gurobi model
         self._build_variables()  # Define variables
         self._build_upper_level_constraint()
+        self. _build_kkt_primal_constraints()
+        self._build_kkt_first_order_constraints()
+        self._build_sos1_complementarity_conditions()
+        
         self._build_objective_function()
+        
         
         self.run()
         self._save_results()
@@ -243,6 +248,233 @@ class Optimal_Investment:
             )
             for n in range(1, 25)
         }
+        ####################DUAL############################"
+# Dual variable for power balance constraints
+        self.variables.lambda_dual = {
+            (w, h, n): self.model.addVar(
+                lb=-GRB.INFINITY,
+                ub=GRB.INFINITY,
+                name=f"Lambda_Node{n}_Scenario{w}_Hour{h}"
+            )
+            for w in self.data.rival_scenarios.columns  # Number of scenarios
+            for h in range(1, 25)  # 24 hours
+            for n in range(1, 25)  # Nodes 1 to 24
+        }
+        
+        # Dual variables for new conventional investment constraints
+        self.variables.min_mu_conv_inv = {
+            (w, h, n): self.model.addVar(
+                lb=0,
+                ub=GRB.INFINITY,
+                name=f"MinMuConvInv_Node{n}_Scenario{w}_Hour{h}"
+            )
+            for w in self.data.rival_scenarios.columns
+            for h in range(1, 25)
+            for n in range(1, 25)
+        }
+        
+        self.variables.max_mu_conv_inv = {
+            (w, h, n): self.model.addVar(
+                lb=0,
+                ub=GRB.INFINITY,
+                name=f"MaxMuConvInv_Node{n}_Scenario{w}_Hour{h}"
+            )
+            for w in self.data.rival_scenarios.columns
+            for h in range(1, 25)
+            for n in range(1, 25)
+        }
+        
+        # Dual variables for PV production constraints
+        self.variables.min_sigma_PV = {
+            (w, h, n): self.model.addVar(
+                lb=0,
+                ub=GRB.INFINITY,
+                name=f"MinSigmaPV_Node{n}_Scenario{w}_Hour{h}"
+            )
+            for w in self.data.rival_scenarios.columns
+            for h in range(1, 25)
+            for n in range(1, 25)
+        }
+        
+        self.variables.max_sigma_PV = {
+            (w, h, n): self.model.addVar(
+                lb=0,
+                ub=GRB.INFINITY,
+                name=f"MaxSigmaPV_Node{n}_Scenario{w}_Hour{h}"
+            )
+            for w in self.data.rival_scenarios.columns
+            for h in range(1, 25)
+            for n in range(1, 25)
+        }
+        
+        # Dual variables for minimum wind production constraints
+        self.variables.min_sigma_wind = {
+            (w, h, n): self.model.addVar(
+                lb=0,
+                ub=GRB.INFINITY,
+                name=f"MinSigmaWind_Node{n}_Scenario{w}_Hour{h}"
+            )
+            for w in self.data.rival_scenarios.columns
+            for h in range(1, 25)
+            for n in range(1, 25)
+        }
+        
+        # Dual variables for maximum wind production constraints
+        self.variables.max_sigma_wind = {
+            (w, h, n): self.model.addVar(
+                lb=0,
+                ub=GRB.INFINITY,
+                name=f"MaxSigmaWind_Node{n}_Scenario{w}_Hour{h}"
+            )
+            for w in self.data.rival_scenarios.columns
+            for h in range(1, 25)
+            for n in range(1, 25)
+        }
+        
+        # Dual variables for existing investor generator constraints
+        self.variables.min_mu_existing = {
+            (w, h, n): self.model.addVar(
+                lb=0,
+                ub=GRB.INFINITY,
+                name=f"MinMuExisting_Node{n}_Scenario{w}_Hour{h}"
+            )
+            for w in self.data.rival_scenarios.columns
+            for h in range(1, 25)
+            for n in self.data.investor_generation_data.loc[:, "Node"].unique()  # Nodes with existing investor generators
+        }
+        
+        self.variables.max_mu_existing = {
+            (w, h, n): self.model.addVar(
+                lb=0,
+                ub=GRB.INFINITY,
+                name=f"MaxMuExisting_Node{n}_Scenario{w}_Hour{h}"
+            )
+            for w in self.data.rival_scenarios.columns
+            for h in range(1, 25)
+            for n in self.data.investor_generation_data.loc[:, "Node"].unique()
+        }
+        
+        # Dual variables for existing rival generator constraints
+        self.variables.min_mu_rival = {
+            (w, h, n): self.model.addVar(
+                lb=0,
+                ub=GRB.INFINITY,
+                name=f"MinMuRival_Node{n}_Scenario{w}_Hour{h}"
+            )
+            for w in self.data.rival_scenarios.columns
+            for h in range(1, 25)
+            for n in self.data.rival_generation_data.loc[:, "Node"].unique()  # Nodes with existing rival generators
+        }
+        
+        self.variables.max_mu_rival = {
+            (w, h, n): self.model.addVar(
+                lb=0,
+                ub=GRB.INFINITY,
+                name=f"MaxMuRival_Node{n}_Scenario{w}_Hour{h}")
+            for w in self.data.rival_scenarios.columns
+            for h in range(1, 25)
+            for n in self.data.rival_generation_data.loc[:, "Node"].unique()
+        }
+
+        # Dual variables for existing rival generator constraints
+        self.variables.min_mu_rival_new = {
+            (w, h, n): self.model.addVar(
+                lb=0, 
+                ub=GRB.INFINITY, 
+                name=f"MinMuRivalNew_Node{n}_Scenario{w}_Hour{h}"
+            )
+            for w in self.data.rival_scenarios.columns  # Scenarios
+            for h in range(1, 25)  # Hours
+            for n in range(1, 25)  # Nodes
+        }
+        
+        self.variables.max_mu_rival_new = {
+            (w, h, n): self.model.addVar(
+                lb=0, 
+                ub=GRB.INFINITY, 
+                name=f"MaxMuRivalNew_Node{n}_Scenario{w}_Hour{h}"
+            )
+            for w in self.data.rival_scenarios.columns  # Scenarios
+            for h in range(1, 25)  # Hours
+            for n in range(1, 25)  # Nodes
+        }
+
+        
+        
+
+        # Dual variables for demand constraints
+        self.variables.min_sigma_demand = {
+            (w, h, n): self.model.addVar(
+                lb=0,
+                ub=GRB.INFINITY,
+                name=f"MinSigmaDemand_Node{n}_Scenario{w}_Hour{h}"
+            )
+            for w in self.data.rival_scenarios.columns
+            for h in range(1, 25)
+            for n in self.data.demand_distribution["Node"].unique()  # Nodes in demand distribution
+        }
+        
+        self.variables.max_sigma_demand = {
+            (w, h, n): self.model.addVar(
+                lb=0,
+                ub=GRB.INFINITY,
+                name=f"MaxSigmaDemand_Node{n}_Scenario{w}_Hour{h}"
+            )
+            for w in self.data.rival_scenarios.columns
+            for h in range(1, 25)
+            for n in self.data.demand_distribution["Node"].unique()
+        }
+        
+        # Dual variables for line flow constraints
+        self.variables.gamma_f = {
+            (w, h, n): self.model.addVar(
+                lb=0,
+                ub=GRB.INFINITY,
+                name=f"GammaFlow_Node{n}_Scenario{w}_Hour{h}"
+            )
+            for w in self.data.rival_scenarios.columns
+            for h in range(1, 25)
+            for n in range(1, 25)
+        }
+        
+        # Dual variables for voltage angle constraints
+        self.variables.min_epsilon_theta = {
+            (w, h, n): self.model.addVar(
+                lb=0,
+                ub=GRB.INFINITY,
+                name=f"MinEpsilonTheta_Node{n}_Scenario{w}_Hour{h}"
+            )
+            for w in self.data.rival_scenarios.columns
+            for h in range(1, 25)
+            for n in range(1, 25)
+        }
+        
+        self.variables.max_epsilon_theta = {
+            (w, h, n): self.model.addVar(
+                lb=0,
+                ub=GRB.INFINITY,
+                name=f"MaxEpsilonTheta_Node{n}_Scenario{w}_Hour{h}"
+            )
+            for w in self.data.rival_scenarios.columns
+            for h in range(1, 25)
+            for n in range(1, 25)
+        }
+        
+        # Dual variables for reference voltage angle constraints
+        self.variables.ref_epsilon = {
+            (w, h): self.model.addVar(
+                lb=0,
+                ub=GRB.INFINITY,
+                name=f"RefEpsilon_Scenario{w}_Hour{h}"
+            )
+            for w in self.data.rival_scenarios.columns
+            for h in range(1, 25)
+        }
+
+
+
+
+        
 
     def _build_upper_level_constraint(self):
         K = 1.6e9 # budget 
@@ -299,6 +531,142 @@ class Optimal_Investment:
             name="Investment budget limit"
         )
         
+    def _build_kkt_primal_constraints(self):
+        
+        # Constraint for new conventional generators
+        self.constraints.lower_level_prod_conv = {
+            (w, h, n): self.model.addConstr(
+                cand_Conv_cost -
+                self.variables.lambda_dual[(w, h, n)] -
+                self.variables.min_mu_conv_inv[(w, h, n)] +
+                self.variables.max_mu_conv_inv[(w, h, n)] == 0,
+                name=f"Lower level prod for conventionals at node {n}, scenario {w}, hour {h}"
+            )
+            for w in self.data.rival_scenarios.columns  # Iterate over scenarios
+            for h in range(1, 25)  # Iterate over hours
+            for n in range(1, 25)  # Iterate over nodes
+        }
+        
+        # Constraint for PV generators
+        self.constraints.lower_level_prod_PV = {
+            (w, h, n): self.model.addConstr(
+                -self.variables.lambda_dual[(w, h, n)] -
+                self.variables.min_sigma_PV[(w, h, n)] +
+                self.variables.max_sigma_PV[(w, h, n)] == 0,
+                name=f"Lower level prod for PV at node {n}, scenario {w}, hour {h}"
+            )
+            for w in self.data.rival_scenarios.columns
+            for h in range(1, 25)
+            for n in range(1, 25)
+        }
+        
+        # Constraint for wind generators
+        self.constraints.lower_level_prod_wind = {
+            (w, h, n): self.model.addConstr(
+                -self.variables.lambda_dual[(w, h, n)] -
+                self.variables.min_sigma_wind[(w, h, n)] +
+                self.variables.max_sigma_wind[(w, h, n)] == 0,
+                name=f"Lower level prod for wind at node {n}, scenario {w}, hour {h}"
+            )
+            for w in self.data.rival_scenarios.columns
+            for h in range(1, 25)
+            for n in range(1, 25)
+        }
+        
+        # Constraint for existing investor generators
+        self.constraints.lower_level_prod_existing = {
+            (w, h, n): self.model.addConstr(
+                self.data.investor_generation_data.loc[
+                    self.data.investor_generation_data["Node"] == n, "Bid price"
+                ].values[0] -
+                self.variables.lambda_dual[(w, h, n)] -
+                self.variables.min_mu_existing[(w, h, n)] +
+                self.variables.max_mu_existing[(w, h, n)] == 0,
+                name=f"Lower level prod for existing investor generator at node {n}, scenario {w}, hour {h}"
+            )
+            for w in self.data.rival_scenarios.columns
+            for h in range(1, 25)
+            for n in self.data.investor_generation_data["Node"].unique()
+        }
+        
+        # Constraint for existing rival generators
+        self.constraints.lower_level_prod_rival = {
+            (w, h, n): self.model.addConstr(
+                self.data.rival_generation_data.loc[
+                    self.data.rival_generation_data["Node"] == n, "Bid_price"
+                ].values[0] -
+                self.variables.lambda_dual[(w, h, n)] -
+                self.variables.min_mu_rival[(w, h, n)] +
+                self.variables.max_mu_rival[(w, h, n)] == 0,
+                name=f"Lower level prod for rival generator at node {n}, scenario {w}, hour {h}"
+            )
+            for w in self.data.rival_scenarios.columns
+            for h in range(1, 25)
+            for n in self.data.rival_generation_data["Node"].unique()
+        }
+        
+        # Constraint for new rival generators
+        self.constraints.lower_level_prod_rival_new = {
+            (w, h, n): self.model.addConstr(
+                self.data.rival_scenarios.loc["Cost", w] -
+                self.variables.lambda_dual[(w, h, n)] -
+                self.variables.min_mu_rival_new[(w, h, n)] +
+                self.variables.max_mu_rival_new[(w, h, n)] == 0,
+                name=f"Lower level prod for rival new generator at node {n}, scenario {w}, hour {h}"
+            )
+            for w in self.data.rival_scenarios.columns
+            for h in range(1, 25)
+            for n in range(1, 25)
+        }
+        
+        # Constraint for demand
+        self.constraints.lower_level_demand = {
+            (w, h, n): self.model.addConstr(
+                self.data.demand_prices.loc[h - 1, "prices"] -
+                self.variables.lambda_dual[(w, h, n)] +
+                self.variables.min_sigma_demand[(w, h, n)] -
+                self.variables.max_sigma_demand[(w, h, n)] == 0,
+                name=f"Lower level demand at node {n}, scenario {w}, hour {h}"
+            )
+            for w in self.data.rival_scenarios.columns
+            for h in range(1, 25)
+            for n in self.data.demand_distribution["Node"].unique()
+        }
+        
+        #print("matrix_B",self.data.matrix_B)
+        # Line flow constraint
+        self.constraints.lower_level_line_flow = {
+            (w, h, n): self.model.addConstr(
+                gp.quicksum(
+                    self.data.matrix_B.loc[n, m] * self.variables.lambda_dual[(w, h, n)]
+                    for m in range(1, 25)
+                ) -
+                gp.quicksum(
+                    self.data.matrix_B.loc[m, n] * self.variables.lambda_dual[(w, h, m)]
+                    for m in range(1, 25)
+                ) -
+                gp.quicksum(
+                    self.data.matrix_B.loc[n, m] * self.variables.gamma_f[(w, h, n)]
+                    for m in range(1, 25)
+                ) -
+                gp.quicksum(
+                    self.data.matrix_B.loc[m, n] * self.variables.gamma_f[(w, h, m)]
+                    for m in range(1, 25)
+                ) -
+                self.variables.min_epsilon_theta[(w, h, n)] +
+                self.variables.max_epsilon_theta[(w, h, n)] == 0,
+                name=f"Lower level line flow at node {n}, scenario {w}, hour {h}"
+            )
+            for w in self.data.rival_scenarios.columns
+            for h in range(1, 25)
+            for n in range(1, 25)
+        }
+
+
+    def _build_kkt_first_order_constraints(self):
+        
+        
+        # Power balance constraints
         # Power balance constraints
         self.constraints.power_balance = {
             (w, h, n): self.model.addConstr(
@@ -311,8 +679,14 @@ class Optimal_Investment:
                 self.variables.prod_new_conv_unit[w, h, n] -
                 self.variables.prod_PV[w, h, n] -
                 self.variables.prod_wind[w, h, n] -
-                self.variables.prod_existing_conv[w, h, n] -
-                self.variables.prod_existing_rival[w, h, n] -
+                (
+                    self.variables.prod_existing_conv[w, h, n] 
+                    if n in self.data.investor_generation_data["Node"].values else 0
+                ) -
+                (
+                    self.variables.prod_existing_rival[w, h, n] 
+                    if n in self.data.rival_generation_data["Node"].values else 0
+                ) -
                 self.variables.prod_new_conv_rival[w, h, n] == 0,
                 name=f"Power balance at node {n}, scenario {w}, hour {h}"
             )
@@ -320,6 +694,7 @@ class Optimal_Investment:
             for h in range(1, 25)  # Hours
             for n in range(1, 25)  # Nodes
         }
+
         
         # Production limits for new conventional units
         self.constraints.production_limits_con = {
@@ -446,6 +821,276 @@ class Optimal_Investment:
             for n in [1]
         }
 
+    def _build_sos1_complementarity_conditions(self):
+        # Auxiliary variables for complementarity conditions
+        self.variables.complementarity_max_conv_inv_auxiliary = {
+            (w, h, n): self.model.addVar(
+                vtype=GRB.CONTINUOUS,
+                name=f"Auxiliary_Max_ConvInv_Scenario{w}_Hour{h}_Node{n}"
+            )
+            for w in self.data.rival_scenarios.columns
+            for h in range(1, 25)
+            for n in range(1, 25)
+        }
+    
+        self.variables.complementarity_max_PV_inv_auxiliary = {
+            (w, h, n): self.model.addVar(
+                vtype=GRB.CONTINUOUS,
+                name=f"Auxiliary_Max_PVInv_Scenario{w}_Hour{h}_Node{n}"
+            )
+            for w in self.data.rival_scenarios.columns
+            for h in range(1, 25)
+            for n in range(1, 25)
+        }
+    
+        self.variables.complementarity_max_wind_inv_auxiliary = {
+            (w, h, n): self.model.addVar(
+                vtype=GRB.CONTINUOUS,
+                name=f"Auxiliary_Max_WindInv_Scenario{w}_Hour{h}_Node{n}"
+            )
+            for w in self.data.rival_scenarios.columns
+            for h in range(1, 25)
+            for n in range(1, 25)
+        }
+        
+        # Auxiliary variables for complementarity conditions
+        self.variables.complementarity_max_conv_existing_auxiliary = {
+            (w, h, n): self.model.addVar(
+                vtype=GRB.CONTINUOUS,
+                name=f"Auxiliary_Max_Conv_Existing_Scenario{w}_Hour{h}_Node{n}"
+            )
+            for w in self.data.rival_scenarios.columns
+            for h in range(1, 25)
+            for n in self.data.investor_generation_data["Node"].unique()  # Only for existing investor generators
+        }
+        
+        self.variables.complementarity_max_rival_existing_auxiliary = {
+            (w, h, n): self.model.addVar(
+                vtype=GRB.CONTINUOUS,
+                name=f"Auxiliary_Max_Rival_Existing_Scenario{w}_Hour{h}_Node{n}"
+            )
+            for w in self.data.rival_scenarios.columns
+            for h in range(1, 25)
+            for n in self.data.rival_generation_data["Node"].unique()  # Only for existing rival generators
+        }
+        
+        self.variables.complementarity_max_theta_flow_auxiliary = {
+            (w, h, n): self.model.addVar(
+                vtype=GRB.CONTINUOUS,
+                name=f"Auxiliary_Max_Theta_Flow_Scenario{w}_Hour{h}_Node{n}"
+            )
+            for w in self.data.rival_scenarios.columns
+            for h in range(1, 25)
+            for n in range(1, 25)
+        }
+
+    
+        # Constraints for auxiliary variables
+        self.constraints.complementarity_max_conv_inv_auxiliary_constraint = {
+            (w, h, n): self.model.addConstr(
+                self.variables.complementarity_max_conv_inv_auxiliary[(w, h, n)] ==
+                self.variables.prod_new_conv_unit[(w, h, n)] - self.variables.cap_invest_conv[n],
+                name=f"Constraint_Max_ConvInv_Scenario{w}_Hour{h}_Node{n}"
+            )
+            for w in self.data.rival_scenarios.columns
+            for h in range(1, 25)
+            for n in range(1, 25)
+        }
+    
+        self.constraints.complementarity_max_PV_inv_auxiliary_constraint = {
+            (w, h, n): self.model.addConstr(
+                self.variables.complementarity_max_PV_inv_auxiliary[(w, h, n)] ==
+                self.variables.prod_PV[(w, h, n)] -
+                self.data.PV_PF_data.loc[h - 1, "PV"] * self.variables.cap_invest_PV[n],
+                name=f"Constraint_Max_PVInv_Scenario{w}_Hour{h}_Node{n}"
+            )
+            for w in self.data.rival_scenarios.columns
+            for h in range(1, 25)
+            for n in range(1, 25)
+        }
+    
+        self.constraints.complementarity_max_wind_inv_auxiliary_constraint = {
+            (w, h, n): self.model.addConstr(
+                self.variables.complementarity_max_wind_inv_auxiliary[(w, h, n)] ==
+                self.variables.prod_wind[(w, h, n)] -
+                self.data.wind_PF_data.loc[h - 1, "Onshore Wind"] * self.variables.cap_invest_wind[n],
+                name=f"Constraint_Max_WindInv_Scenario{w}_Hour{h}_Node{n}"
+            )
+            for w in self.data.rival_scenarios.columns
+            for h in range(1, 25)
+            for n in range(1, 25)
+        }
+    
+        # SOS1 constraints
+        self.constraints.sos1_max_production_conv = {
+            (w, h, n): self.model.addSOS(
+                GRB.SOS_TYPE1,
+                [self.variables.complementarity_max_conv_inv_auxiliary[(w, h, n)],
+                 self.variables.max_mu_conv_inv[(w, h, n)]]
+            )
+            for w in self.data.rival_scenarios.columns
+            for h in range(1, 25)
+            for n in range(1, 25)
+        }
+    
+        self.constraints.sos1_max_production_PV = {
+            (w, h, n): self.model.addSOS(
+                GRB.SOS_TYPE1,
+                [self.variables.complementarity_max_PV_inv_auxiliary[(w, h, n)],
+                 self.variables.max_sigma_PV[(w, h, n)]]
+            )
+            for w in self.data.rival_scenarios.columns
+            for h in range(1, 25)
+            for n in range(1, 25)
+        }
+    
+        self.constraints.sos1_max_production_wind = {
+            (w, h, n): self.model.addSOS(
+                GRB.SOS_TYPE1,
+                [self.variables.complementarity_max_wind_inv_auxiliary[(w, h, n)],
+                 self.variables.max_sigma_wind[(w, h, n)]]
+            )
+            for w in self.data.rival_scenarios.columns
+            for h in range(1, 25)
+            for n in range(1, 25)
+        }
+    
+        self.constraints.sos1_min_production_conv = {
+            (w, h, n): self.model.addSOS(
+                GRB.SOS_TYPE1,
+                [self.variables.min_mu_conv_inv[(w, h, n)],
+                 self.variables.prod_new_conv_unit[(w, h, n)]]
+            )
+            for w in self.data.rival_scenarios.columns
+            for h in range(1, 25)
+            for n in range(1, 25)
+        }
+    
+        self.constraints.sos1_min_production_PV = {
+            (w, h, n): self.model.addSOS(
+                GRB.SOS_TYPE1,
+                [self.variables.min_sigma_PV[(w, h, n)],
+                 self.variables.prod_PV[(w, h, n)]]
+            )
+            for w in self.data.rival_scenarios.columns
+            for h in range(1, 25)
+            for n in range(1, 25)
+        }
+    
+        self.constraints.sos1_min_production_wind = {
+            (w, h, n): self.model.addSOS(
+                GRB.SOS_TYPE1,
+                [self.variables.min_sigma_wind[(w, h, n)],
+                 self.variables.prod_wind[(w, h, n)]]
+            )
+            for w in self.data.rival_scenarios.columns
+            for h in range(1, 25)
+            for n in range(1, 25)
+        }
+
+        # Complementarity for existing investor generators
+        self.constraints.complementarity_max_existing_inv_auxiliary_constraint = {
+            (w, h, n): self.model.addConstr(
+                self.variables.complementarity_max_conv_existing_auxiliary[(w, h, n)] ==
+                self.variables.prod_existing_conv[(w, h, n)] -
+                self.data.investor_generation_data.loc[
+                    self.data.investor_generation_data["Node"] == n, "Pmax"
+                ].values[0],
+                name=f"Auxiliary_Constraint_Max_Conv_Existing_Scenario{w}_Hour{h}_Node{n}"
+            )
+            for w in self.data.rival_scenarios.columns
+            for h in range(1, 25)
+            for n in self.data.investor_generation_data["Node"].unique()
+        }
+    
+        # Complementarity for existing rival generators
+        self.constraints.complementarity_max_existing_rival_auxiliary_constraint = {
+            (w, h, n): self.model.addConstr(
+                self.variables.complementarity_max_rival_existing_auxiliary[(w, h, n)] ==
+                self.variables.prod_existing_rival[(w, h, n)] -
+                self.data.rival_generation_data.loc[
+                    self.data.rival_generation_data["Node"] == n, "Pmax"
+                ].values[0],
+                name=f"Auxiliary_Constraint_Max_Rival_Existing_Scenario{w}_Hour{h}_Node{n}"
+            )
+            for w in self.data.rival_scenarios.columns
+            for h in range(1, 25)
+            for n in self.data.rival_generation_data["Node"].unique()
+        }
+    
+        # Complementarity for new rival generators
+        self.constraints.complementarity_max_new_rival_auxiliary_constraint = {
+            (w, h, n): self.model.addConstr(
+                self.variables.complementarity_max_rival_new_auxiliary[(w, h, n)] ==
+                self.variables.prod_new_conv_rival[(w, h, n)] -
+                self.data.rival_scenarios.loc["Capacity", w],
+                name=f"Auxiliary_Constraint_Max_Rival_New_Scenario{w}_Hour{h}_Node{n}"
+            )
+            for w in self.data.rival_scenarios.columns
+            for h in range(1, 25)
+            for n in range(1, 25)
+        }
+    
+        # Complementarity for theta (voltage angle) flow
+        self.constraints.complementarity_theta_flow_auxiliary_constraint = {
+            (w, h, n): self.model.addConstr(
+                self.variables.complementarity_max_theta_flow_auxiliary[(w, h, n)] ==
+                gp.quicksum(
+                    self.data.matrix_B.loc[n, m] * (self.variables.voltage_angle[(w, h, n)] -
+                                                             self.variables.voltage_angle[(w, h, m)])
+                    for m in range(1, 25)
+                ) - self.data.capacity_matrix.loc[n - 1, m - 1],
+                name=f"Auxiliary_Constraint_Theta_Flow_Scenario{w}_Hour{h}_Node{n}"
+            )
+            for w in self.data.rival_scenarios.columns
+            for h in range(1, 25)
+            for n in range(1, 25)
+        }
+    
+        # SOS1 for theta complementarity
+        self.constraints.sos1_theta_flow = {
+            (w, h, n): self.model.addSOS(
+                GRB.SOS_TYPE1,
+                [self.variables.gamma_f[(w, h, n)],
+                 self.variables.complementarity_max_theta_flow_auxiliary[(w, h, n)]]
+            )
+            for w in self.data.rival_scenarios.columns
+            for h in range(1, 25)
+            for n in range(1, 25)
+        }
+    
+        # SOS1 for existing investor generators
+        self.constraints.sos1_max_production_existing_inv = {
+            (w, h, n): self.model.addSOS(
+                GRB.SOS_TYPE1,
+                [self.variables.min_mu_existing[(w, h, n)], self.variables.prod_existing_conv[(w, h, n)]]
+            )
+            for w in self.data.rival_scenarios.columns
+            for h in range(1, 25)
+            for n in self.data.investor_generation_data["Node"].unique()
+        }
+    
+        # SOS1 for existing rival generators
+        self.constraints.sos1_max_production_existing_rival = {
+            (w, h, n): self.model.addSOS(
+                GRB.SOS_TYPE1,
+                [self.variables.min_mu_rival[(w, h, n)], self.variables.prod_existing_rival[(w, h, n)]]
+            )
+            for w in self.data.rival_scenarios.columns
+            for h in range(1, 25)
+            for n in self.data.rival_generation_data["Node"].unique()
+        }
+    
+        # SOS1 for new rival generators
+        self.constraints.sos1_max_production_new_rival = {
+            (w, h, n): self.model.addSOS(
+                GRB.SOS_TYPE1,
+                [self.variables.min_mu_rival_new[(w, h, n)], self.variables.prod_new_conv_rival[(w, h, n)]]
+            )
+            for w in self.data.rival_scenarios.columns
+            for h in range(1, 25)
+            for n in range(1, 25)
+        }
 
 
 

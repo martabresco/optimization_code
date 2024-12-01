@@ -326,7 +326,7 @@ class Optimal_Investment:
             (w, h, n): self.model.addConstr(
                 self.variables.demand_consumed[w, h, n] +
                 gp.quicksum(
-                    self.data.matrix_B.iloc[n - 1, m - 1] * 
+                    self.data.matrix_B.iloc[n-1, m-1] * 
                     (self.variables.voltage_angle[w, h, n] - self.variables.voltage_angle[w, h, m])
                     for m in range(1, 25) if m != n
                 ) -
