@@ -1,6 +1,5 @@
 import gurobipy as gp
 from gurobipy import GRB
-import pandas as pd
 import math as m
 
 from Data import investor_generation_data
@@ -166,22 +165,22 @@ class Optimal_Investment():
         self.variables.prod_existing_conv ={
             (w, h, n): self.model.addVar(
                 lb=0, 
-                ub=investor_generation_data.iloc[n, 2], #maybe there is an error here
+                ub = investor_generation_data.iloc[n, 2], #maybe there is an error here
                 name=f'Electricity production of existing conventional investor at node {n}, scenario {w} and hour {h}'
                 )
             for w in range(len(self.data.Rival_scenarios_cap))   # Assuming you have a list of generators
             for h in range(len(self.data.hour))       # Iterating over hours
-            for n in range(len(self.data.existing_investor_generator_id))       # Iterating over nodes
+            for n in range(len(self.data.nodes))       # Iterating over nodes
             }
         self.variables.prod_existing_rival={
             (w,h,n): self.model.addVar(
                 lb=0,
-                ub=rival_generation_data.iloc[n, 2],
+                ub=rival_generation_data.iloc[n,2],
                 name = f'Electricity production of existing conventional from rival, at node {n}, scenario {w} and hour {h}'
                 )#maybe there is an error here)
             for w in range(len(self.data.Rival_scenarios_cap)) # Assuming you have a list of generators
             for h in range(len(self.data.hour))       # Iterating over hours
-            for n in range(len(self.data.existing_rival_generator_id))
+            for n in range(len(self.data.nodes)) 
             }
         self.variables.prod_new_conv_rival={
             (w,h,n): self.model.addVar(
@@ -196,7 +195,7 @@ class Optimal_Investment():
         self.variables.demand_consumed={
             (w,h,n): self.model.addVar(
                 lb=0,
-                ub=Demand_scenarios.iloc[h-1,w], #maybe this is wrong
+                ub=Demand_scenarios.iloc[h,w], #maybe this is wrong
                 name = f'Electricity consumed by demand at node {n}, scenario {w} and hour {h}'
                 )#maybe there is an error here)
             for w in range(len(self.data.Rival_scenarios_cap))   # Assuming you have a list of generators
@@ -326,7 +325,7 @@ class Optimal_Investment():
                 name = f'Min mu existing generators for node {n}, scenario{w} and hour {h}')
                 for w in range(len(self.data.Rival_scenarios_cap))  # Assuming you have a list of generators
                 for h in range(len(self.data.hour))       # Iterating over hours
-                for n in range(len(self.data.existing_investor_generator_id))       # Iterating over nodes
+                for n in range(len(self.data.nodes))      # Iterating over nodes
                 }
         self.variables.max_mu_existing ={
             (w,h,n):self.model.addVar(
@@ -334,7 +333,7 @@ class Optimal_Investment():
                 name = f'Max mu existing generators for node {n}, scenario{w} and hour {h}')
                 for w in range(len(self.data.Rival_scenarios_cap))  # Assuming you have a list of generators
                 for h in range(len(self.data.hour))       # Iterating over hours
-                for n in range(len(self.data.existing_investor_generator_id))      # Iterating over nodes
+                for n in range(len(self.data.nodes))      # Iterating over nodes
                 }
         self.variables.min_mu_rival ={
             (w,h,n):self.model.addVar(
@@ -342,7 +341,7 @@ class Optimal_Investment():
                 name = f'Min mu rival generators for node {n}, scenario{w} and hour {h}')
                 for w in range(len(self.data.Rival_scenarios_cap))  # Assuming you have a list of generators
                 for h in range(len(self.data.hour))       # Iterating over hours
-                for n in range(len(self.data.existing_rival_generator_id))       # Iterating over nodes
+                for n in range(len(self.data.nodes))       # Iterating over nodes
                 }
         self.variables.max_mu_rival ={
             (w,h,n):self.model.addVar(
@@ -350,7 +349,7 @@ class Optimal_Investment():
                 name = f'max mu rival generators for node {n}, scenario{w} and hour {h}')
                 for w in range(len(self.data.Rival_scenarios_cap))  # Assuming you have a list of generators
                 for h in range(len(self.data.hour))       # Iterating over hours
-                for n in range(len(self.data.existing_rival_generator_id))        # Iterating over nodes
+                for n in range(len(self.data.nodes))        # Iterating over nodes
                 }
         self.variables.min_mu_rival_new ={
             (w,h,n):self.model.addVar(
@@ -374,7 +373,7 @@ class Optimal_Investment():
                 name = f'min sigma demand for node {n}, scenario{w} and hour {h}')
                 for w in range(len(self.data.Rival_scenarios_cap))  # Assuming you have a list of generators
                 for h in range(len(self.data.hour))       # Iterating over hours
-                for n in range(len(self.data.demand_id))    # Iterating over nodes
+                for n in range(len(self.data.nodes))   # Iterating over nodes
                 }
         self.variables.max_sigma_demand ={
             (w,h,n):self.model.addVar(
@@ -382,7 +381,7 @@ class Optimal_Investment():
                 name = f'max sigma demand for node {n}, scenario{w} and hour {h}')
                 for w in range(len(self.data.Rival_scenarios_cap))  # Assuming you have a list of generators
                 for h in range(len(self.data.hour))       # Iterating over hours
-                for n in range(len(self.data.demand_id))    # Iterating over nodes
+                for n in range(len(self.data.nodes))  # Iterating over nodes
                 }
         
         self.variables.gamma_f = {
@@ -517,7 +516,7 @@ class Optimal_Investment():
         )
         for w in range(len(self.data.Rival_scenarios_cap))  # Assuming you have a list of generators
         for h in range(len(self.data.hour)) # Iterating over hours
-        for n in range(len(self.data.existing_investor_generator_id))
+        for n in range(len(self.data.nodes))
         }
 
         # Lower level prod for rival generators
@@ -531,7 +530,7 @@ class Optimal_Investment():
             )
             for w in range(len(self.data.Rival_scenarios_cap))  # Assuming you have rival scenarios
             for h in range(len(self.data.hour)) # Iterating over hours
-            for n in range(len(self.data.existing_rival_generator_id))  # Iterating over rival generator rows
+            for n in range(len(self.data.nodes)) # Iterating over rival generator rows
         }
         
         # Lower level prod for rival new generators
@@ -559,7 +558,7 @@ class Optimal_Investment():
             )
             for w in range(len(self.data.Rival_scenarios_cap))  # Rival scenarios
             for h in range(len(self.data.hour)) # Iterating over hours
-            for n in range(len(self.data.demand_id))  # Iterating over nodes
+            for n in range(len(self.data.nodes))  # Iterating over nodes
         }
         
         # Lower level line flow constraints
@@ -577,27 +576,34 @@ class Optimal_Investment():
             for h in range(len(self.data.hour)) # Iterating over hours
             for n in range(len(self.data.nodes))  # Iterating over nodes
         }
-
-  
     def _build_kkt_first_order_constraints(self):
-        #lagrangian
-        print("before issue constraint")
+            
+        print("before issue")
+
+        
+        # Building constraints
         self.constraints.second_level_primal_line = {
-        (w,h,n): self.model.addLConstr(
-                self.variables.demand_consumed[(w,h,n1)]+gp.quicksum(matrix_B.iloc[n,m]*(self.variables.theta[(w,h,n)]-self.variables.theta[(w,h,m)])for m  in range(len(self.data.nodes)))
-                - self.variables.prod_new_conv_unit[(w,h,n)] -
-                self.variables.prod_PV [(w,h,n)] - self.variables.prod_wind[(w,h,n)] - 
-                self.variables.prod_existing_conv [(w,h,n2)] - self.variables.prod_existing_rival [(w,h,n3)] - 
-                self.variables.prod_new_conv_rival [(w,h,n)],
-                GRB.EQUAL,0,
-                name='second level constraint, primal,line')
-            for w in range(len(self.data.Rival_scenarios_cap))  # Assuming you have a list of generators
-            for h in range(len(self.data.hour))       # Iterating over hours
-            for n in range(len(self.data.nodes))
-            for n1 in range(len(self.data.demand_id))
-            for n2 in range(len(self.data.existing_investor_generator_id))
-            for n3 in range(len(self.data.existing_rival_generator_id))
-            } 
+            (w, h, n): self.model.addLConstr(
+                (self.variables.demand_consumed[(w, h, n)]) +
+                gp.quicksum(matrix_B.iloc[n, m] * 
+                            (self.variables.theta[(w, h, n)] - self.variables.theta[(w, h, m)]) 
+                            for m in range(len(self.data.nodes))) -
+                self.variables.prod_new_conv_unit[(w, h, n)] -
+                self.variables.prod_PV[(w, h, n)] -
+                self.variables.prod_wind[(w, h, n)] -
+                (self.variables.prod_existing_conv[(w, h, n)]) -
+                (self.variables.prod_existing_rival[(w, h, n)]) -
+                self.variables.prod_new_conv_rival[(w, h, n)],
+                GRB.EQUAL,
+                0,
+                name=f'second_level_constraint_primal_line_w{w}_h{h}_n{n}'
+            )
+            for w in range(len(self.data.Rival_scenarios_cap))   # Iterating over scenarios
+            for h in range(len(self.data.hour))                 # Iterating over hours
+            for n in range(len(self.data.nodes))               # Iterating over all nodes
+        }
+  
+   
         print("after issue constraint")
         
         self.constraints.second_level_primal_conv_lower_bound = {
@@ -633,7 +639,7 @@ class Optimal_Investment():
         self.constraints.second_level_primal_PV_upper_bound = {
         (w,h,n): self.model.addLConstr(
                 self.variables.prod_PV[(w,h,n)], 
-                GRB.LESS_EQUAL,PV_PF_data[h,1][n]*self.variables.cap_invest_PV[n] ,
+                GRB.LESS_EQUAL,PV_PF_data.iloc[h, 1]*self.variables.cap_invest_PV[n] ,
                 name='second level constraint, primal PV upper bound ')
             for w in range(len(self.data.Rival_scenarios_cap))  # Assuming you have a list of generators
             for h in range(len(self.data.hour))       # Iterating over hours
@@ -653,7 +659,7 @@ class Optimal_Investment():
         self.constraints.second_level_primal_wind_upper_bound = {
         (w,h,n): self.model.addLConstr(
                 self.variables.prod_wind[(w,h,n)], 
-                GRB.LESS_EQUAL,Wind_PF_data[h,1][n]* self.variables.cap_invest_Wind[n] ,
+                GRB.LESS_EQUAL,Wind_PF_data.iloc[h,1]* self.variables.cap_invest_Wind[n] ,
                 name='second level constraint, primal wind upper bound ')
             for w in range(len(self.data.Rival_scenarios_cap))  # Assuming you have a list of generators
             for h in range(len(self.data.hour))       # Iterating over hours
@@ -674,11 +680,11 @@ class Optimal_Investment():
         self.constraints.second_level_primal_exist_upper_bound = {
         (w,h,n): self.model.addLConstr(
                 self.variables.prod_existing_conv[(w,h,n)], 
-                GRB.LESS_EQUAL, investor_generation_data[n,"Pmax [MW]"] ,
+                GRB.LESS_EQUAL, investor_generation_data.iloc[n,2] ,
                 name='second level constraint, primal existing upper bound ')
             for w in range(len(self.data.Rival_scenarios_cap))  # Assuming you have a list of generators
             for h in range(len(self.data.hour))       # Iterating over hours
-            for n in range(investor_generation_data.shape[0])       # Iterating over nodes where there is a generator
+            for n in range(len(self.data.nodes))      # Iterating over nodes where there is a generator
         }
         
         self.constraints.second_level_primal_rival_lower_bound = {
@@ -694,11 +700,11 @@ class Optimal_Investment():
         self.constraints.second_level_primal_rival_upper_bound = {
         (w,h,n): self.model.addLConstr(
                 self.variables.prod_existing_rival[(w,h,n)], 
-                GRB.LESS_EQUAL, rival_generation_data[n,"Pmax [MW]"][w] ,
+                GRB.LESS_EQUAL, rival_generation_data.iloc[n,2] ,
                 name='second level constraint, primal rival upper bound ')
             for w in range(len(self.data.Rival_scenarios_cap))  # Assuming you have a list of generators
             for h in range(len(self.data.hour))       # Iterating over hours
-            for n in range(rival_generation_data.shape[0])       # Iterating over nodes where there is a generator
+            for n in range(len(self.data.nodes))        # Iterating over nodes where there is a generator
         }
         
         self.constraints.second_level_primal_rival_new_lower_bound = {
@@ -734,17 +740,17 @@ class Optimal_Investment():
         self.constraints.second_level_primal_demand_upper_bound = {
         (w,h,n): self.model.addLConstr(
                 self.variables.demand_consumed[(w,h,n)], 
-                GRB.LESS_EQUAL, (self.Demand_distribution[n,2]/100)* self.Demand_Scenarios[h,w] ,
+                GRB.LESS_EQUAL, (Demand_distribution.iloc[n,2])/100* Demand_scenarios.iloc[h,w] ,
                 name='second level constraint, primal demand upper bound ')
             for w in range(len(self.data.Rival_scenarios_cap))  # Assuming you have a list of generators
             for h in range(len(self.data.hour))       # Iterating over hours
-            for n in range(self.data.Demand_distribution.shape[1])     # Iterating over nodes where there is a generator
+            for n in range(len(self.data.nodes))     # Iterating over nodes where there is a generator
         }
     
 
         self.constraints.second_level_primal_line = {
         (w,h,n): self.model.addLConstr(
-                (matrix_B[n][m]*(self.variables.theta[(w,h,n)]-self.variables.theta[w][h][m])for m in self.data.nodes),
+                (matrix_B[n][m]*(self.variables.theta[(w,h,n)]-self.variables.theta[(w,h,m)])for m in self.data.nodes),
                 GRB.LESS_EQUAL,(capacity_matrix[n,m] for m in self.data.nodes) ,
                 name='second level constraint, primal,line')
             for w in range(len(self.data.Rival_scenarios_cap))  # Assuming you have a list of generators
@@ -780,7 +786,7 @@ class Optimal_Investment():
             )
             for w in range(len(self.data.Rival_scenarios_cap))  # Assuming you have a list of generators
             for h in range(len(self.data.hour)) # Iterating over hours
-            for n in range(len(self.data.nodes)) if n == 13  # Only apply the constraint for node 13
+            for n in range(len(self.data.nodes)) if n == 12  # Only apply the constraint for node 13
         }
 
     
@@ -871,7 +877,7 @@ class Optimal_Investment():
                name=f'Auxiliary for max prod existing inv for scenario {w}, in hour {h}, in node {n}')
                for w in range(len(self.data.Rival_scenarios_cap))  # Assuming you have a list of generators
                for h in range(len(self.data.hour))       # Iterating over hours
-               for n in range(investor_generation_data.shape[0])
+               for n in range(len(self.data.nodes))
            }
        self.constraints.complementarity_max_existing_rival_auxiliary_constraint={
            (w,h,n): self.model.addConstr(
@@ -879,7 +885,7 @@ class Optimal_Investment():
                name=f'Auxiliary for max prod existing existing rival for scenario {w}, in hour {h}, in node {n}')
                for w in range(len(self.data.Rival_scenarios_cap))  # Assuming you have a list of generators
                for h in range(len(self.data.hour))       # Iterating over hours
-               for n in range(rival_generation_data.shape[0])
+               for n in range(len(self.data.nodes))
            }
        self.constraints.complementarity_max_new_rival_auxiliary_constraint={
            (w,h,n): self.model.addConstr(
@@ -891,7 +897,7 @@ class Optimal_Investment():
            }
        self.constraints.complementarity_theta_flow_auxiliary_constraint={
            (w,h,n): self.model.addConstr(
-              self.variables.complementarity_max_theta_flow_auxiliary[(w,h,n)] == (self.variables.theta[(w,h,n)] - self.variables.theta[w][h][m] for m in self.data.nodes),
+              self.variables.complementarity_max_theta_flow_auxiliary[(w,h,n)] == (self.variables.theta[(w,h,n)] - self.variables.theta[(w,h,m)] for m in self.data.nodes),
                name=f'Auxiliary for max prod new rival for scenario {w}, in hour {h}, in node {n}')
                for w in range(len(self.data.Rival_scenarios_cap))  # Assuming you have a list of generators
                for h in range(len(self.data.hour))       # Iterating over hours
@@ -1035,11 +1041,11 @@ class Optimal_Investment():
                     self.variables.lambda_dual[(w,h,n)]*
                         # Summing production values across all nodes for each hour
                         (self.variables.prod_new_conv_unit[(w,h,n)] +
-                        (self.variables.prod_existing_conv[(w,h,n)] if n == investor_generation_data["Node"]+1 else 0) +
+                        (self.variables.prod_existing_conv[(w,h,n)]) +
                         self.variables.prod_PV[(w,h,n)] +
                         self.variables.prod_wind[(w,h,n)])
                         - self.variables.prod_new_conv_unit[(w,h,n)] * cand_Conv_cost # Subtracting investment cost for new conventional units
-                        - (self.variables.prod_existing_conv[(w,h,n)] * investor_generation_data.iloc[investor_generation_data.index[investor_generation_data["Node"] == n+1].tolist(), 3] if n == investor_generation_data["Node"]+1 else 0) # Subtracting cost for existing conventional units (cost in the 4th column of investor_generation_data)
+                        - (self.variables.prod_existing_conv[(w,h,n)] * investor_generation_data.iloc[n,3]) # Subtracting cost for existing conventional units (cost in the 4th column of investor_generation_data)
                         )
                         for n in range(len(self.data.nodes))  # Summing over all nodes
                         )
@@ -1094,7 +1100,7 @@ class Optimal_Investment():
         if self.model.status == GRB.OPTIMAL:
             self._save_results()
         else:
-            raise RuntimeError(f"optimization was not successful")
+            raise RuntimeError("optimization was not successful")
     
     def display_results(self):
         print()

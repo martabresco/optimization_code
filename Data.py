@@ -35,10 +35,10 @@ def scenarios_creation():
     # print("Demand", arr_dem)
     # print("Rival", arr_riv)
         
-    Df_demand=pd.DataFrame(arr_dem,index=['1','2','3','4','5','6',
+    Df_demand=pd.DataFrame(arr_dem,index=['0','1','2','3','4','5','6',
                                                      '7','8','9','10','11','12',
                                                      '13','14','15','16','17','18',
-                                                     '19','20','21','22','23','24'],
+                                                     '19','20','21','22','23'],
                                columns=['S1','S2','S3','S4','S5','S6',
                                                      'S7','S8','S9','S10','S11','S12',
                                                      'S13','S14','S15','S16'])
@@ -177,7 +177,7 @@ for _, _, from_node, to_node, x, _ in data:
 
 
 # Convert to a DataFrame for better readability
-matrix_df = pd.DataFrame(matrix, index=range(1, num_nodes + 1), columns=range(1, num_nodes + 1))
+matrix_df = pd.DataFrame(matrix, index=range(0, num_nodes), columns=range(0, num_nodes ))
 matrix_df
 
 
@@ -193,7 +193,7 @@ for _, _, from_node, to_node, x, _ in data:
 
 
 # Convert to a DataFrame for better readability
-matrix_B = pd.DataFrame(matrix, index=range(1, num_nodes + 1), columns=range(1, num_nodes + 1))
+matrix_B = pd.DataFrame(matrix, index=range(0, num_nodes), columns=range(0, num_nodes))
 matrix_B
 
 
@@ -212,7 +212,7 @@ for _, row in df.iterrows():
     capacity_matrix[n - 1, m - 1] = capacity  # Assuming undirected graph
 
 # Convert to DataFrame for better visualization (optional)
-capacity_matrix = pd.DataFrame(capacity_matrix, index=range(1, num_nodes + 1), columns=range(1, num_nodes + 1))
+capacity_matrix = pd.DataFrame(capacity_matrix, index=range(0, num_nodes ), columns=range(0, num_nodes ))
 
 # Print or return the matrix
 print(capacity_matrix)
