@@ -576,6 +576,8 @@ class Optimal_Investment():
             for h in range(len(self.data.hour)) # Iterating over hours
             for n in range(len(self.data.nodes))  # Iterating over nodes
         }
+        
+        
     def _build_kkt_first_order_constraints(self):
             
         print("before issue")
@@ -750,12 +752,13 @@ class Optimal_Investment():
 
         self.constraints.second_level_primal_line = {
         (w,h,n): self.model.addLConstr(
-                (matrix_B[n][m]*(self.variables.theta[(w,h,n)]-self.variables.theta[(w,h,m)])for m in self.data.nodes),
-                GRB.LESS_EQUAL,(capacity_matrix[n,m] for m in self.data.nodes) ,
+                (matrix_B.iloc[n][m]*(self.variables.theta[(w,h,n)]-self.variables.theta[(w,h,m)])),
+                GRB.LESS_EQUAL,(capacity_matrix.iloc[n,m]) ,
                 name='second level constraint, primal,line')
             for w in range(len(self.data.Rival_scenarios_cap))  # Assuming you have a list of generators
             for h in range(len(self.data.hour))       # Iterating over hours
-            for n in range(len(self.data.nodes))       # Iterating over nodes
+            for n in range(len(self.data.nodes))  # Iterate over 'From' nodes in lines
+            for m in range(len(self.data.nodes))   # Iterate over 'To' nodes connected to n
         } 
     
         self.constraints.second_level_primal_theta_lower_bound = {
@@ -795,50 +798,66 @@ class Optimal_Investment():
     def _build_sos1_complementarity_conditions(self):
         # auxiliary variables (1 associated with each primal inequality constraint)
        self.variables.complementarity_max_conv_inv_auxiliary={
-           (w,h,n): self.model.addVars(
+           (w,h,n): self.model.addVar(
                vtype=GRB.CONTINUOUS, name=f'Auxiliary for max prod conv new for scenario {w}, in hour {h}, in node {n}')
                for w in range(len(self.data.Rival_scenarios_cap))  # Assuming you have a list of generators
                for h in range(len(self.data.hour)) # Iterating over hours
                for n in range(len(self.data.nodes))
-           }
+           }        
        self.variables.complementarity_max_PV_inv_auxiliary={
-           (w,h,n): self.model.addVars(
+           (w,h,n): self.model.addVar(
                vtype=GRB.CONTINUOUS, name=f'Auxiliary for max prod PV new for scenario {w}, in hour {h}, in node {n}')
                for w in range(len(self.data.Rival_scenarios_cap))  # Assuming you have a list of generators
                for h in range(len(self.data.hour)) # Iterating over hours
                for n in range(len(self.data.nodes))
            }
        self.variables.complementarity_max_wind_inv_auxiliary={
-           (w,h,n): self.model.addVars(
+           (w,h,n): self.model.addVar(
                vtype=GRB.CONTINUOUS, name=f'Auxiliary for max prod wind new for scenario {w}, in hour {h}, in node {n}')
                for w in range(len(self.data.Rival_scenarios_cap))  # Assuming you have a list of generators
                for h in range(len(self.data.hour)) # Iterating over hours
                for n in range(len(self.data.nodes))
            }
        self.variables.complementarity_max_conv_existing_auxiliary={
-           (w,h,n): self.model.addVars(
+           (w,h,n): self.model.addVar(
                vtype=GRB.CONTINUOUS, name=f'Auxiliary for max prod existing conv for scenario {w}, in hour {h}, in node {n}')
                for w in range(len(self.data.Rival_scenarios_cap))  # Assuming you have a list of generators
                for h in range(len(self.data.hour)) # Iterating over hours
                for n in range(len(self.data.nodes))
            }
        self.variables.complementarity_max_rival_existing_auxiliary={
-           (w,h,n): self.model.addVars(
+           (w,h,n): self.model.addVar(
                vtype=GRB.CONTINUOUS, name=f'Auxiliary for max prod conv existing rival for scenario {w}, in hour {h}, in node {n}')
                for w in range(len(self.data.Rival_scenarios_cap))  # Assuming you have a list of generators
                for h in range(len(self.data.hour)) # Iterating over hours
                for n in range(len(self.data.nodes))
            }
        self.variables.complementarity_max_rival_new_auxiliary={
-           (w,h,n): self.model.addVars(
+           (w,h,n): self.model.addVar(
                vtype=GRB.CONTINUOUS, name=f'Auxiliary for max prod rival new for scenario {w}, in hour {h}, in node {n}')
                for w in range(len(self.data.Rival_scenarios_cap))  # Assuming you have a list of generators
                for h in range(len(self.data.hour)) # Iterating over hours
                for n in range(len(self.data.nodes))
            }
        self.variables.complementarity_max_theta_flow_auxiliary={
-           (w,h,n): self.model.addVars(
+           (w,h,n): self.model.addVar(
                vtype=GRB.CONTINUOUS, name=f'Auxiliary for for theta flow for scenario {w}, in hour {h}, in node {n}')
+               for w in range(len(self.data.Rival_scenarios_cap))  # Assuming you have a list of generators
+               for h in range(len(self.data.hour)) # Iterating over hours
+               for n in range(len(self.data.nodes))
+           }
+       
+       self.variables.complementarity_theta_upper_auxiliary={
+           (w,h,n): self.model.addVar(
+               vtype=GRB.CONTINUOUS, name=f'Auxiliary for for theta for scenario {w}, in hour {h}, in node {n}')
+               for w in range(len(self.data.Rival_scenarios_cap))  # Assuming you have a list of generators
+               for h in range(len(self.data.hour)) # Iterating over hours
+               for n in range(len(self.data.nodes))
+           }
+       
+       self.variables.complementarity_theta_lower_auxiliary={
+           (w,h,n): self.model.addVar(
+               vtype=GRB.CONTINUOUS, name=f'Auxiliary for for theta for scenario {w}, in hour {h}, in node {n}')
                for w in range(len(self.data.Rival_scenarios_cap))  # Assuming you have a list of generators
                for h in range(len(self.data.hour)) # Iterating over hours
                for n in range(len(self.data.nodes))
@@ -847,8 +866,8 @@ class Optimal_Investment():
 
        # equality constraints setting the auxilliary variables equal to lhs of constraints. 
        self.constraints.complementarity_max_conv_inv_auxiliary_constraint={
-           (w,h,n): self.model.addConstr(
-               self.variables.complementarity_max_conv_inv_auxiliary[(w,h,n)]== self.variables.prod_new_conv_unit[(w,h,n)]-self.variable.cap_invest_conv[n], 
+           (w,h,n): self.model.addLConstr(
+               self.variables.complementarity_max_conv_inv_auxiliary[(w,h,n)]== self.variables.prod_new_conv_unit[(w,h,n)]-self.variables.cap_invest_conv[n], 
                name=f'Auxiliary constraint for max prod conv new for scenario {w}, in hour {h}, in node {n}')
                for w in range(len(self.data.Rival_scenarios_cap))  # Assuming you have a list of generators
                for h in range(len(self.data.hour)) # Iterating over hours
@@ -856,48 +875,68 @@ class Optimal_Investment():
            }
        
        self.constraints.complementarity_max_PV_inv_auxiliary_constraint={
-           (w,h,n): self.model.addConstr(
-               self.variables.complementarity_max_PV_inv_auxiliary[(w,h,n)] == self.variables.prod_PV[(w,h,n)]-PV_PF_data[h,1][n]*self.variables.cap_invest_PV[n], 
+           (w,h,n): self.model.addLConstr(
+               self.variables.complementarity_max_PV_inv_auxiliary[(w,h,n)] == self.variables.prod_PV[(w,h,n)]-PV_PF_data.iloc[h,1]*self.variables.cap_invest_PV[n], 
                name=f'Auxiliary for max prod PV new for scenario {w}, in hour {h}, in node {n}')
                for w in range(len(self.data.Rival_scenarios_cap))  # Assuming you have a list of generators
                for h in range(len(self.data.hour)) # Iterating over hours
                for n in range(len(self.data.nodes))
            }
        self.constraints.complementarity_max_wind_inv_auxiliary_constraint={
-           (w,h,n): self.model.addConstr(
-               self.variables.complementarity_max_wind_inv_auxiliary[(w,h,n)] == self.variables.prod_wind[(w,h,n)]- Wind_PF_data[h,1][n]* self.variables.cap_invest_Wind[n], 
+           (w,h,n): self.model.addLConstr(
+               self.variables.complementarity_max_wind_inv_auxiliary[(w,h,n)] == self.variables.prod_wind[(w,h,n)]- Wind_PF_data.iloc[h,1]* self.variables.cap_invest_Wind[n], 
                name=f'Auxiliary for max prod wind new for scenario {w}, in hour {h}, in node {n}')
                for w in range(len(self.data.Rival_scenarios_cap))  # Assuming you have a list of generators
                for h in range(len(self.data.hour)) # Iterating over hours
                for n in range(len(self.data.nodes))
            }
        self.constraints.complementarity_max_existing_inv_auxiliary_constraint={
-           (w,h,n): self.model.addConstr(
-               self.variables.complementarity_max_existing_inv_auxiliary[(w,h,n)]  == self.variables.prod_existing_conv[(w,h,n)]- investor_generation_data[n,"Pmax [MW]"] ,
+           (w,h,n): self.model.addLConstr(
+               self.variables.complementarity_max_conv_existing_auxiliary[(w,h,n)]  == self.variables.prod_existing_conv[(w,h,n)]- investor_generation_data.iloc[n,2] ,
                name=f'Auxiliary for max prod existing inv for scenario {w}, in hour {h}, in node {n}')
                for w in range(len(self.data.Rival_scenarios_cap))  # Assuming you have a list of generators
                for h in range(len(self.data.hour))       # Iterating over hours
                for n in range(len(self.data.nodes))
            }
        self.constraints.complementarity_max_existing_rival_auxiliary_constraint={
-           (w,h,n): self.model.addConstr(
-              self.variables.complementarity_max_rival_existing_auxiliary[(w,h,n)] == self.variables.prod_existing_rival[(w,h,n)] - rival_generation_data[n,"Pmax [MW]"][w] ,
+           (w,h,n): self.model.addLConstr(
+              self.variables.complementarity_max_rival_existing_auxiliary[(w,h,n)] == self.variables.prod_existing_rival[(w,h,n)] - rival_generation_data.iloc[n,2] ,
                name=f'Auxiliary for max prod existing existing rival for scenario {w}, in hour {h}, in node {n}')
                for w in range(len(self.data.Rival_scenarios_cap))  # Assuming you have a list of generators
                for h in range(len(self.data.hour))       # Iterating over hours
                for n in range(len(self.data.nodes))
            }
        self.constraints.complementarity_max_new_rival_auxiliary_constraint={
-           (w,h,n): self.model.addConstr(
+           (w,h,n): self.model.addLConstr(
               self.variables.complementarity_max_rival_new_auxiliary[(w,h,n)] == self.variables.prod_new_conv_rival[(w,h,n)] - self.data.Rival_scenarios_cap[w] ,
                name=f'Auxiliary for max prod new rival for scenario {w}, in hour {h}, in node {n}')
                for w in range(len(self.data.Rival_scenarios_cap))  # Assuming you have a list of generators
                for h in range(len(self.data.hour))       # Iterating over hours
                for n in range(len(self.data.nodes))
            }
+       
        self.constraints.complementarity_theta_flow_auxiliary_constraint={
-           (w,h,n): self.model.addConstr(
-              self.variables.complementarity_max_theta_flow_auxiliary[(w,h,n)] == (self.variables.theta[(w,h,n)] - self.variables.theta[(w,h,m)] for m in self.data.nodes),
+           (w,h,n): self.model.addLConstr(
+              self.variables.complementarity_max_theta_flow_auxiliary[(w,h,n)] == (matrix_B.iloc[n,m] *(self.variables.theta[(w,h,n)] - self.variables.theta[(w,h,m)])-capacity_matrix.iloc[n,m]),
+               name=f'Auxiliary for max prod new rival for scenario {w}, in hour {h}, in node {n}')
+               for w in range(len(self.data.Rival_scenarios_cap))  # Assuming you have a list of generators
+               for h in range(len(self.data.hour))       # Iterating over hours
+               for n in range(len(self.data.nodes))
+               for m in range(len(self.data.nodes))
+           }
+       
+       self.constraints.complementarity_theta_upper_auxiliary_constraint={
+           (w,h,n): self.model.addLConstr(
+              self.variables.complementarity_theta_upper_auxiliary[(w,h,n)] == (-m.pi -self.variables.theta[(w,h,n)]) ,
+               name=f'Auxiliary for max prod new rival for scenario {w}, in hour {h}, in node {n}')
+               for w in range(len(self.data.Rival_scenarios_cap))  # Assuming you have a list of generators
+               for h in range(len(self.data.hour))       # Iterating over hours
+               for n in range(len(self.data.nodes))
+           }
+       
+       self.constraints.complementarity_theta_lower_auxiliary_constraint={
+           (w,h,n): self.model.addLConstr(
+              self.variables.complementarity_theta_lower_auxiliary[(w,h,n)] == (-m.pi +self.variables.theta[(w,h,n)]) ,
                name=f'Auxiliary for max prod new rival for scenario {w}, in hour {h}, in node {n}')
                for w in range(len(self.data.Rival_scenarios_cap))  # Assuming you have a list of generators
                for h in range(len(self.data.hour))       # Iterating over hours
@@ -956,11 +995,12 @@ class Optimal_Investment():
         
        self.constraints.sos1_max_production_theta_flow = {
          (w,h,n): self.model.addSOS(
-                 GRB.SOS_TYPE1, [self.variables.gamma_f[(w,h,n)], (matrix_B[n,m] *(self.variables.complementarity_max_theta_flow_auxiliary[(w,h,n)])-capacity_matrix[n,m] for m in self.data.nodes)]
+                 GRB.SOS_TYPE1, [self.variables.gamma_f[(w,h,n)], (self.variables.complementarity_max_theta_flow_auxiliary[(w,h,n)])]
              )
              for w in range(len(self.data.Rival_scenarios_cap))  # Assuming you have a list of generators
              for h in range(len(self.data.hour))       # Iterating over hours
              for n in range(len(self.data.nodes))       # Iterating over nodes
+             for m in range(len(self.data.nodes))   
          }
         
        self.constraints.sos1_min_production_conv = {
@@ -1013,7 +1053,7 @@ class Optimal_Investment():
         }
        self.constraints.sos1_min_theta = {
         (w,h,n): self.model.addSOS(
-                GRB.SOS_TYPE1, [self.variables.min_epsilon_theta[(w,h,n)] , (-m.pi -self.variables.theta[(w,h,n)]) ]
+                GRB.SOS_TYPE1, [self.variables.min_epsilon_theta[(w,h,n)] , self.variables.complementarity_theta_lower_auxiliary[(w,h,n)]]
             )
             for w in range(len(self.data.Rival_scenarios_cap))  # Assuming you have a list of generators
             for h in range(len(self.data.hour))       # Iterating over hours
@@ -1021,7 +1061,7 @@ class Optimal_Investment():
         }
        self.constraints.sos1_min_theta = {
         (w,h,n): self.model.addSOS(
-                GRB.SOS_TYPE1, [self.variables.max_epsilon_theta[(w,h,n)] , (-m.pi +self.variables.theta[(w,h,n)]) ]
+                GRB.SOS_TYPE1, [self.variables.max_epsilon_theta[(w,h,n)] , self.variables.complementarity_theta_upper_auxiliary[(w,h,n)]]
             )
             for w in range(len(self.data.Rival_scenarios_cap))  # Assuming you have a list of generators
             for h in range(len(self.data.hour))       # Iterating over hours
@@ -1030,31 +1070,45 @@ class Optimal_Investment():
        
 
     def _build_objective_function(self):
-        objective = (
-            GRB.quicksum(Investment_data.iloc[0, 1] * self.variables.cap_invest_conv[n] for n in range(len(self.data.nodes))) +
-            GRB.quicksum(Investment_data.iloc[1, 1] * self.variables.cap_invest_PV[n] for n in range(len(self.data.nodes))) +
-            GRB.quicksum(Investment_data.iloc[2, 1] * self.variables.cap_invest_Wind[n] for n in range(len(self.data.nodes))) +
-            
-            - 20*365* GRB.quicksum(
-                probability_scenario[w] *  # For each scenario, multiply by the probability
-                GRB.quicksum(GRB.quicksum(
-                    self.variables.lambda_dual[(w,h,n)]*
-                        # Summing production values across all nodes for each hour
-                        (self.variables.prod_new_conv_unit[(w,h,n)] +
-                        (self.variables.prod_existing_conv[(w,h,n)]) +
-                        self.variables.prod_PV[(w,h,n)] +
-                        self.variables.prod_wind[(w,h,n)])
-                        - self.variables.prod_new_conv_unit[(w,h,n)] * cand_Conv_cost # Subtracting investment cost for new conventional units
-                        - (self.variables.prod_existing_conv[(w,h,n)] * investor_generation_data.iloc[n,3]) # Subtracting cost for existing conventional units (cost in the 4th column of investor_generation_data)
-                        )
-                        for n in range(len(self.data.nodes))  # Summing over all nodes
-                        )
-                    for h in range(self.data.hour)  # Iterate over all hours
-                    )
-                for w in range(len(self.data.Rival_scenarios_cap))  # Iterate over all scenarios
-            
-        )
-        self.model.setObjective(objective, GRB.MAXIMIZE)
+         # Investment costs
+         investment_costs = (
+             gp.quicksum(Investment_data.iloc[0, 1] * self.variables.cap_invest_conv[n] for n in range(len(self.data.nodes))) +
+             gp.quicksum(Investment_data.iloc[1, 1] * self.variables.cap_invest_PV[n] for n in range(len(self.data.nodes))) +
+             gp.quicksum(Investment_data.iloc[2, 1] * self.variables.cap_invest_Wind[n] for n in range(len(self.data.nodes)))
+         )
+         
+         # Operational profits
+         operational_profits = (
+             -20 * 365 * gp.quicksum(
+                 probability_scenario[w] *
+                 gp.quicksum(
+                     gp.quicksum(
+                         self.variables.lambda_dual[(w, h, n)] * (
+                             self.variables.prod_new_conv_unit[(w, h, n)] +
+                             self.variables.prod_existing_conv[(w, h, n)] +
+                             self.variables.prod_PV[(w, h, n)] +
+                             self.variables.prod_wind[(w, h, n)]
+                         )
+                         - self.variables.prod_new_conv_unit[(w, h, n)] * cand_Conv_cost
+                         - self.variables.prod_existing_conv[(w, h, n)] * investor_generation_data.iloc[n, 3]
+                         for n in range(len(self.data.nodes))  # Iterate over all nodes
+                     )
+                     for h in range(len(self.data.hour))  # Iterate over all hours
+                 )
+                 for w in range(len(self.data.Rival_scenarios_cap))  # Iterate over all scenarios
+             )
+         )
+         
+         # Combine the terms
+         objective = investment_costs + operational_profits
+         
+         # Debugging: Check intermediate values
+         #print("Investment Costs:", investment_costs)
+         #print("Operational Profits:", operational_profits)
+         
+         # Set the objective
+         self.model.setObjective(objective, GRB.MAXIMIZE)
+
 
     def _build_model(self):
         self.model = gp.Model(name='Bilevel optimal investment strategy')
@@ -1100,7 +1154,7 @@ class Optimal_Investment():
         if self.model.status == GRB.OPTIMAL:
             self._save_results()
         else:
-            raise RuntimeError("optimization was not successful")
+            raise RuntimeError("Optimization was not successful")
     
     def display_results(self):
         print()
@@ -1165,7 +1219,12 @@ if __name__ == "__main__":
         
     model = Optimal_Investment(input_data)
     model.run()
+    
+    model.computeIIS()
+    model.write("infeasible.ilp")
+    
     model.display_results()
+
     
 
 
