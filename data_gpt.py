@@ -194,5 +194,5 @@ capacity_matrix = create_capacity_matrix(lines_data)
 
 #RISK
 
-beta=1
-alpha=0.5
+# beta=1
+# alpha=0.5

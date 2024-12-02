@@ -70,7 +70,7 @@ class InputData:
 
 
 class Optimal_Investment:
-    def __init__(self, input_data: InputData,complementarity_method: str = 'SOS1',beta:float=0.5, alpha: float=0.95, K: float=1.6e9):
+    def __init__(self, input_data: InputData,complementarity_method: str = 'SOS1',beta:float=0.5, alpha: float=0.95, K: float=9e8):
         self.data = input_data  # Reference to the InputData instance
         self.beta=beta
         self.alpha=alpha
@@ -515,6 +515,13 @@ class Optimal_Investment:
             for k in self.data.demand_scenarios.columns
         }
         
+        investment_cost = gp.quicksum(
+            self.data.investment_data.loc[self.data.investment_data["Technology"] == "Conventional", "Inv_Cost"].values[0] * self.variables.cap_invest_conv[n] +
+            self.data.investment_data.loc[self.data.investment_data["Technology"] == "PV", "Inv_Cost"].values[0] * self.variables.cap_invest_PV[n] +
+            self.data.investment_data.loc[self.data.investment_data["Technology"] == "Wind", "Inv_Cost"].values[0] * self.variables.cap_invest_wind[n]
+            for n in range(1, 25)
+        )
+        
         self.constraints.eta_zeta_profit = {
             k: self.model.addConstr(
                 self.variables.eta[k] >= self.variables.zeta - (20 * 365 * gp.quicksum(
@@ -538,7 +545,7 @@ class Optimal_Investment:
                     )
                     for h in range(1, 25)
                     for n in range(1, 25)
-                )),
+                )) + investment_cost,
                 name=f"eta_ge_zeta_minus_profit_scenario_{k}"
             )
             for k in self.data.demand_scenarios.columns
@@ -599,7 +606,7 @@ class Optimal_Investment:
 
         # Update objective function
         self.model.setObjective(
-            -investment_cost + (1-self.beta)*production_revenue + self.beta * risk_term,
+              (1-self.beta)*(production_revenue-investment_cost) + self.beta * risk_term,
             GRB.MAXIMIZE
         )
         # # Set the objective as the minimization of total cost
