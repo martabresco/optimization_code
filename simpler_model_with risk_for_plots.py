@@ -51,9 +51,7 @@ class InputData:
         rival_scenarios: pd.DataFrame,
         omega_node_set: dict[int, list],
         capacity_matrix: pd.DataFrame,
-        matrix_B: pd.DataFrame,
-        beta: float,
-        alpha: float,
+        matrix_B: pd.DataFrame
     ):
         self.investor_generation_data = investor_generation_data
         self.rival_generation_data = rival_generation_data
@@ -70,13 +68,15 @@ class InputData:
         self.omega_node_set = omega_node_set
         self.capacity_matrix = capacity_matrix
         self.matrix_B = matrix_B
-        self.beta=beta
-        self.alpha=alpha
+
 
 
 class Optimal_Investment:
-    def __init__(self, input_data: InputData,beta,complementarity_method: str = 'SOS1'):
+    def __init__(self, input_data: InputData,complementarity_method: str = 'SOS1',beta:float=0.5, alpha: float=0.95, K: float=1.6e9):
         self.data = input_data  # Reference to the InputData instance
+        self.beta=beta
+        self.alpha=alpha
+        self.K=K
         #self.complementarity_method = complementarity_method  # Complementarity method
         self.variables = Expando()  # Container for decision variables
         self.constraints = Expando()  # Container for constraints
@@ -267,7 +267,7 @@ class Optimal_Investment:
         }
 
     def _build_upper_level_constraint(self):
-        K = 1.6e8 # budget 
+        #K = 1.6e8 # budget 
         # Maximum capacity investment for conventional units at each node
         self.constraints.upper_level_max_inv_conv = {
             n: self.model.addConstr(
@@ -317,7 +317,7 @@ class Optimal_Investment:
                 self.data.investment_data.iloc[1, 1] * self.variables.cap_invest_PV[n] +
                 self.data.investment_data.iloc[2, 1] * self.variables.cap_invest_wind[n]
                 for n in range(1, 25)
-            ) <= K,
+            ) <= self.K,
             name="Investment budget limit"
         )
         
@@ -506,7 +506,7 @@ class Optimal_Investment:
 
 
 
-    def _build_objective_function(self,beta):
+    def _build_objective_function(self):
         # Assuming 'probability_scenario' is a list of probabilities for each scenario
         probability_scenario=[0.06,0.06,0.06,0.02,0.06,0.06,0.06,0.02,0.09,0.09,0.09,0.03,0.09,0.09,0.09,0.03] # Adjust based on actual probabilities if available
     
@@ -548,14 +548,14 @@ class Optimal_Investment:
 # alpha = 0.05  # Confidence level for the risk measure
 
         # Add risk measure to the objective
-        risk_term = self.variables.zeta + (1 / (1 - alpha)) * gp.quicksum(
+        risk_term = self.variables.zeta + (1 / (1 - self.alpha)) * gp.quicksum(
             probability_scenario[int(k[-1]) - 1] * self.variables.eta[k]
             for k in self.data.demand_scenarios.columns
         )
 
         # Update objective function
         self.model.setObjective(
-            investment_cost - (1-beta)*production_revenue + beta * risk_term,
+            investment_cost - (1-self.beta)*production_revenue + self.beta * risk_term,
             GRB.MINIMIZE
         )
 
@@ -683,30 +683,180 @@ def prepare_input_data():
         rival_scenarios=Df_rival,
         omega_node_set=Omega_n_sets,
         capacity_matrix=capacity_matrix,
-        matrix_B=susceptance_matrix,
-        beta=beta,
-        alpha=alpha
-    )
+        matrix_B=susceptance_matrix    )
 
-if __name__ == "__main__":
-    # Prepare input data
-    input_data = prepare_input_data()
 
-    # Instantiate the optimization model
-    model_instance = Optimal_Investment(input_data=input_data, complementarity_method='SOS1')
 
-    # Define the range of beta values to analyze
-    beta_values = [0.1, 0.2, 0.3, 0.4, 0.5]  # Adjust the range and step size as needed
 
-    # Function to vary beta and store results
-    results_df = vary_beta_and_store_results(model_instance, beta_values)
+def vary_beta_and_store_results(model_instance, beta_values):
+    """
+    Function to vary beta, solve the optimization problem, and store results.
+    Stores the beta value, objective function value, the node invested in, 
+    and the respective investments (PV, Wind, Conventional) with their capacities.
+    """
+    results = []
 
-    # Display the results
-    print("Results of varying beta:")
-    print(results_df)
+    for beta in beta_values:
+        print(f"Running optimization for beta = {beta}...")
+        # Set beta dynamically in the model instance
+        model_instance.beta = beta
+        
+        # Rebuild the objective function with the updated beta
+        model_instance._build_objective_function()
+        
+        # Run the optimization
+        model_instance.model.optimize()
+        
+        # Extract results
+        objective_value = model_instance.model.ObjVal if model_instance.model.status == GRB.OPTIMAL else None
+        
+        # Check for investments
+        invested_nodes = [
+            n for n in model_instance.variables.node_bin
+            if model_instance.variables.node_bin[n].x > 0.5
+        ]
+        
+        invested_node = invested_nodes[0] if invested_nodes else None
+        
+        # Extract investments by type
+        pv_capacity = (
+            model_instance.variables.cap_invest_PV[invested_node].x
+            if invested_node and model_instance.variables.cap_invest_PV[invested_node].x > 0 else 0
+        )
+        wind_capacity = (
+            model_instance.variables.cap_invest_wind[invested_node].x
+            if invested_node and model_instance.variables.cap_invest_wind[invested_node].x > 0 else 0
+        )
+        conventional_capacity = (
+            model_instance.variables.cap_invest_conv[invested_node].x
+            if invested_node and model_instance.variables.cap_invest_conv[invested_node].x > 0 else 0
+        )
 
-    # Optionally, save the results to a CSV file
-    results_df.to_csv("beta_results.csv", index=False)
+        # Store results
+        results.append({
+            "beta": beta,
+            "objective_value": objective_value,
+            "invested_node": invested_node,
+            "pv_capacity": pv_capacity,
+            "wind_capacity": wind_capacity,
+            "conventional_capacity": conventional_capacity,
+        })
+    
+    # Convert results to a pandas DataFrame
+    results_df = pd.DataFrame(results)
+    
+    return results_df
+
+def vary_K_and_store_results(model_instance, K_values):
+    """
+    Function to vary the parameter K, solve the optimization problem,
+    and store results. Stores the value of K, the objective function value,
+    the invested node, and the respective capacities (PV, Wind, Conventional).
+    """
+    results = []
+
+    for K in K_values:
+        print(f"Running optimization for K = {K}...")
+        
+        # Update the budget constraint
+        model_instance.constraints.upper_level_max_investment_budget.RHS = K
+        
+        # Re-optimize the model
+        model_instance.model.optimize()
+        
+        # Extract results
+        if model_instance.model.status == GRB.OPTIMAL:
+            objective_value = model_instance.model.ObjVal
+        else:
+            print(f"Model did not converge for K = {K}")
+            objective_value = None
+
+        # Check for investments
+        invested_nodes = [
+            n for n in model_instance.variables.node_bin
+            if model_instance.variables.node_bin[n].x > 0.5
+        ]
+        
+        invested_node = invested_nodes[0] if invested_nodes else None
+
+        # Extract investments by type
+        pv_capacity = (
+            model_instance.variables.cap_invest_PV[invested_node].x
+            if invested_node and model_instance.variables.cap_invest_PV[invested_node].x > 0 else 0
+        )
+        wind_capacity = (
+            model_instance.variables.cap_invest_wind[invested_node].x
+            if invested_node and model_instance.variables.cap_invest_wind[invested_node].x > 0 else 0
+        )
+        conventional_capacity = (
+            model_instance.variables.cap_invest_conv[invested_node].x
+            if invested_node and model_instance.variables.cap_invest_conv[invested_node].x > 0 else 0
+        )
+
+        # Store results
+        results.append({
+            "K_value": K,
+            "objective_value": objective_value,
+            "invested_node": invested_node,
+            "pv_capacity": pv_capacity,
+            "wind_capacity": wind_capacity,
+            "conventional_capacity": conventional_capacity,
+        })
+    
+    # Convert results to a pandas DataFrame
+    results_df = pd.DataFrame(results)
+    
+    return results_df
+
+# ########## No sensitivity analysis
+# if __name__ == "_main_":
+#     input_data = prepare_input_data()
+#     model = Optimal_Investment(input_data=input_data, complementarity_method='SOS1')
+#     model.run()
+#     model.display_results()
+
+##########To vary beta
+
+# if __name__ == "__main__":
+#     # Prepare input data
+#     input_data = prepare_input_data()
+
+#     # Instantiate the optimization model
+#     model_instance = Optimal_Investment(input_data=input_data, complementarity_method='SOS1')
+
+#     # Define the range of beta values to analyze
+#     beta_values = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1]  # Adjust the range and step size as needed
+
+#     # Function to vary beta and store results
+#     results_df = vary_beta_and_store_results(model_instance, beta_values)
+
+#     # Display the results
+#     print("Results of varying beta:")
+#     print(results_df)
+
+#     # Optionally, save the results to a CSV file
+#     results_df.to_csv("beta_results.csv", index=False)
+
+########to vary K
+# if __name__ == "__main__":
+#     # Prepare input data
+#     input_data = prepare_input_data()
+
+#     # Instantiate the optimization model
+#     model_instance = Optimal_Investment(input_data=input_data, complementarity_method='SOS1')
+
+#     # Define the range of K values to analyze
+#     K_values = [1e5, 1e6, 1e7,1e8,1e9,1e10]  # Example K values in dollars
+
+#     # Vary K and store results
+#     results_df = vary_K_and_store_results(model_instance, K_values)
+
+#     # Display the results
+#     print("Results of varying K:")
+#     print(results_df)
+
+#     # Optionally, save the results to a CSV file
+#     results_df.to_csv("K_results.csv", index=False)
 
 
 
