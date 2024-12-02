@@ -21,7 +21,7 @@ from Data import probability_scenario
 
 nodes = list(range(1, 25))
 K = 1.6e9  #in dollars, max investment budget
-cand_Conv_cost=7.24;
+cand_Conv_cost=7.24
 
 class Expando(object):
     '''
