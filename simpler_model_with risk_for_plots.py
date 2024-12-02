@@ -75,7 +75,7 @@ class InputData:
 
 
 class Optimal_Investment:
-    def __init__(self, input_data: InputData,complementarity_method: str = 'SOS1'):
+    def __init__(self, input_data: InputData,beta,complementarity_method: str = 'SOS1'):
         self.data = input_data  # Reference to the InputData instance
         #self.complementarity_method = complementarity_method  # Complementarity method
         self.variables = Expando()  # Container for decision variables
@@ -506,7 +506,7 @@ class Optimal_Investment:
 
 
 
-    def _build_objective_function(self):
+    def _build_objective_function(self,beta):
         # Assuming 'probability_scenario' is a list of probabilities for each scenario
         probability_scenario=[0.06,0.06,0.06,0.02,0.06,0.06,0.06,0.02,0.09,0.09,0.09,0.03,0.09,0.09,0.09,0.03] # Adjust based on actual probabilities if available
     
@@ -555,7 +555,7 @@ class Optimal_Investment:
 
         # Update objective function
         self.model.setObjective(
-            investment_cost - production_revenue + beta * risk_term,
+            investment_cost - (1-beta)*production_revenue + beta * risk_term,
             GRB.MINIMIZE
         )
 
@@ -689,10 +689,24 @@ def prepare_input_data():
     )
 
 if __name__ == "__main__":
+    # Prepare input data
     input_data = prepare_input_data()
-    model = Optimal_Investment(input_data=input_data, complementarity_method='SOS1')
-    model.run()
-    model.display_results()
+
+    # Instantiate the optimization model
+    model_instance = Optimal_Investment(input_data=input_data, complementarity_method='SOS1')
+
+    # Define the range of beta values to analyze
+    beta_values = [0.1, 0.2, 0.3, 0.4, 0.5]  # Adjust the range and step size as needed
+
+    # Function to vary beta and store results
+    results_df = vary_beta_and_store_results(model_instance, beta_values)
+
+    # Display the results
+    print("Results of varying beta:")
+    print(results_df)
+
+    # Optionally, save the results to a CSV file
+    results_df.to_csv("beta_results.csv", index=False)
 
 
 
