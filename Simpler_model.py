@@ -271,6 +271,7 @@ class Optimal_Investment():
                 name = 'Max capacity investment for conventionals in node {n}'.format(n))
             for n in self.data.nodes
             }
+        
         self.constraints.upper_level_max_num_investments_per_node={
             n: self.model.addConstr(
                 self.variables.conv_invest_bin[n]+ self.variables.PV_invest_bin[n] + self.variables.wind_invest_bin[n]<= 3*self.variables.node_bin[n],
@@ -278,6 +279,7 @@ class Optimal_Investment():
                 )
             for n in self.data.nodes
             }
+        
         self.constraint.upper_level_only_invest_one_node= self.model.addConstr(
             grb.quicksum(self.variables.node_bin[n] for n in self.data.nodes) <= 1,
             name = 'Only invest in one node of the system')
@@ -353,8 +355,7 @@ class Optimal_Investment():
        
         self.constraints.production_limits_existing_con = {
             (w, h, n): self.model.addConstr(
-                0 <= self.variables.prod_existing_conv[w, h, n] <= investor_generation_data.iloc[
-               investor_generation_data.iloc[:, 1] == n, 2].values[0],  # Accessing the value in column 2
+                0 <= self.variables.prod_existing_conv[w, h, n] <= investor_generation_data.iloc[investor_generation_data.iloc[:, 1] == n, 2].values[0],  # Accessing the value in column 2
                 name='Production limits existing conventional unit in node {n} scenario {w} at hour {h}'.format(n=n, w=w, h=h)
                 )
             for w in range(self.data.Rival_scenarios.shape[1])  # Iterating over scenarios
@@ -452,6 +453,8 @@ class Optimal_Investment():
             for w in range(self.data.Rival_scenarios.shape[1])  # Iterate over all scenarios
             for h in range(self.data.hour)  # Iterate over all hours
             }
+        
+        
         
         def _build_objective_function(self):
             # Assuming 'probability_scenario' is meant to be a list of probabilities for each scenario
