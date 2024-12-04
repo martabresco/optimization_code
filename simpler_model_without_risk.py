@@ -48,8 +48,8 @@ class InputData:
         demand_scenarios: pd.DataFrame,
         rival_scenarios: pd.DataFrame,
         omega_node_set: dict[int, list],
-        capacity_matrix: pd.DataFrame,
-        matrix_B: pd.DataFrame,
+        capacity_matrix: pd.DataFrame, #we dont care anymore (F matrix)
+        matrix_B: pd.DataFrame, #we dont care abt line transmission anymore
     ):
         self.investor_generation_data = investor_generation_data
         self.rival_generation_data = rival_generation_data
@@ -170,17 +170,17 @@ class Optimal_Investment:
             for n in range(1, 25)
         }
 
-        # Define voltage angle variables
-        self.variables.voltage_angle = {
-            (w, h, n): self.model.addVar(
-                lb=-m.pi,
-                ub=m.pi,
-                name=f"Voltage_Angle_Scenario{w}_Hour{h}_Node{n}"
-            )
-            for w in self.data.demand_scenarios.columns
-            for h in range(1, 25)
-            for n in range(1, 25)
-        }
+        # Define voltage angle variables - NOT NEEDED ANYMORE
+        # self.variables.voltage_angle = {
+        #     (w, h, n): self.model.addVar(
+        #         lb=-m.pi,
+        #         ub=m.pi,
+        #         name=f"Voltage_Angle_Scenario{w}_Hour{h}_Node{n}"
+        #     )
+        #     for w in self.data.demand_scenarios.columns
+        #     for h in range(1, 25)
+        #     for n in range(1, 25)
+        # }
 
         # Define investment decision variables#xnc
         self.variables.cap_invest_conv = {
@@ -299,27 +299,27 @@ class Optimal_Investment:
             name="Investment budget limit"
         )
         
-        # Power balance constraints
-        self.constraints.power_balance = {
-            (w, h, n): self.model.addConstr(
-                self.variables.demand_consumed[w, h, n] +
-                gp.quicksum(
-                    self.data.matrix_B.iloc[n - 1, m - 1] * 
-                    (self.variables.voltage_angle[w, h, n] - self.variables.voltage_angle[w, h, m])
-                    for m in range(1, 25) if m != n
-                ) -
-                self.variables.prod_new_conv_unit[w, h, n] -
-                self.variables.prod_PV[w, h, n] -
-                self.variables.prod_wind[w, h, n] -
-                self.variables.prod_existing_conv[w, h, n] -
-                self.variables.prod_existing_rival[w, h, n] -
-                self.variables.prod_new_conv_rival[w, h, n] == 0,
-                name=f"Power balance at node {n}, scenario {w}, hour {h}"
-            )
-            for w in self.data.rival_scenarios.columns  # Scenarios
-            for h in range(1, 25)  # Hours
-            for n in range(1, 25)  # Nodes
-        }
+        # Power balance constraints - NOT NEEDED ANY MORE
+        # self.constraints.power_balance = {
+        #     (w, h, n): self.model.addConstr(
+        #         self.variables.demand_consumed[w, h, n] +
+        #         gp.quicksum(
+        #             self.data.matrix_B.iloc[n - 1, m - 1] * 
+        #             (self.variables.voltage_angle[w, h, n] - self.variables.voltage_angle[w, h, m])
+        #             for m in range(1, 25) if m != n
+        #         ) -
+        #         self.variables.prod_new_conv_unit[w, h, n] -
+        #         self.variables.prod_PV[w, h, n] -
+        #         self.variables.prod_wind[w, h, n] -
+        #         self.variables.prod_existing_conv[w, h, n] -
+        #         self.variables.prod_existing_rival[w, h, n] -
+        #         self.variables.prod_new_conv_rival[w, h, n] == 0,
+        #         name=f"Power balance at node {n}, scenario {w}, hour {h}"
+        #     )
+        #     for w in self.data.rival_scenarios.columns  # Scenarios
+        #     for h in range(1, 25)  # Hours
+        #     for n in range(1, 25)  # Nodes
+        # }
         
         # Production limits for new conventional units
         self.constraints.production_limits_con = {
@@ -422,29 +422,29 @@ class Optimal_Investment:
             for n in self.data.demand_distribution["Node"].unique()  # Iterate over nodes in demand distribution
         }
 
-    # Constraint for line power flows based on voltage angle differences and line reactance
-        self.constraints.line_power_flow = {
-            (w, h, n, m): self.model.addConstr(
-                self.data.matrix_B.loc[n, m] * (
-                    self.variables.voltage_angle[w, h, n] - self.variables.voltage_angle[w, h, m]
-                ) <= self.data.capacity_matrix.loc[n, m],
-                name=f"Power flow on line {n}-{m}, scenario {w}, hour {h}"
-            )
-            for w in self.data.rival_scenarios.columns  # Iterate over scenario columns
-            for h in range(1, 25)  # Iterate over 24 hours
-            for n in self.data.lines_data["From"].unique()  # Iterate over 'From' nodes in lines
-            for m in self.data.lines_data.loc[self.data.lines_data["From"] == n, "To"]  # Iterate over 'To' nodes connected to n
-        }
-                #Constraint to set voltage angle to 0 for the reference node (Node 1)
-        self.constraints.voltage_angle_fixed_node1 = {
-            (w, h): self.model.addConstr(
-                self.variables.voltage_angle[w, h, n] == 0,
-                name=f"Voltage angle fixed to 0 at Node 1, scenario {w}, hour {h}"
-            )
-            for w in self.data.rival_scenarios.columns  # Iterate over all scenario columns
-            for h in range(1, 25)  # Iterate over 24 hours
-            for n in [1]
-        }
+    # Constraint for line power flows based on voltage angle differences and line reactance - NOT NEEDED ANYMORE
+        # self.constraints.line_power_flow = {
+        #     (w, h, n, m): self.model.addConstr(
+        #         self.data.matrix_B.loc[n, m] * (
+        #             self.variables.voltage_angle[w, h, n] - self.variables.voltage_angle[w, h, m]
+        #         ) <= self.data.capacity_matrix.loc[n, m],
+        #         name=f"Power flow on line {n}-{m}, scenario {w}, hour {h}"
+        #     )
+        #     for w in self.data.rival_scenarios.columns  # Iterate over scenario columns
+        #     for h in range(1, 25)  # Iterate over 24 hours
+        #     for n in self.data.lines_data["From"].unique()  # Iterate over 'From' nodes in lines
+        #     for m in self.data.lines_data.loc[self.data.lines_data["From"] == n, "To"]  # Iterate over 'To' nodes connected to n
+        # }
+                #Constraint to set voltage angle to 0 for the reference node (Node 1) - NOT NEEDED ANY MORE
+        # self.constraints.voltage_angle_fixed_node1 = {
+        #     (w, h): self.model.addConstr(
+        #         self.variables.voltage_angle[w, h, n] == 0,
+        #         name=f"Voltage angle fixed to 0 at Node 1, scenario {w}, hour {h}"
+        #     )
+        #     for w in self.data.rival_scenarios.columns  # Iterate over all scenario columns
+        #     for h in range(1, 25)  # Iterate over 24 hours
+        #     for n in [1]
+        # }
 
 
 
@@ -546,7 +546,7 @@ class Optimal_Investment:
             if self.variables.cap_invest_wind[n].x > 0:
                 print(f"  - Wind Capacity: {self.variables.cap_invest_wind[n].x:.2f} MW")
             if self.variables.node_bin[n].x > 0:
-                print(f"  - Investment Active in Node")
+                print("  - Investment Active in Node")
         
         # # Production Results
         # print("\nProduction Results:")
