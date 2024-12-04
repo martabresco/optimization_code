@@ -429,7 +429,7 @@ class Optimal_Investment():
                 name=f'Max capacity investment for conventionals in node {n}'
                 )
             for n in range(len(self.data.nodes))
-            }
+            } #tried
 
         self.constraints.upper_level_max_num_investments_per_node = {
             n: self.model.addConstr(
@@ -439,7 +439,7 @@ class Optimal_Investment():
                 name=f'We can only invest in one tech per node {n}'
                 )
             for n in range(len(self.data.nodes))
-            }
+            } #tried
 
         self.constraints.upper_level_only_invest_one_node= self.model.addConstr(
             gp.quicksum(self.variables.node_bin[n] for n in range(len(self.data.nodes))) <= 1,
@@ -451,7 +451,7 @@ class Optimal_Investment():
               name=f'Max capacity investment for PV in node {n}'
               )
           for n in range(len(self.data.nodes))
-          }
+          } #tried
 
         self.constraint_upper_level_max_inv_wind = {
             n: self.model.addConstr(
@@ -459,13 +459,13 @@ class Optimal_Investment():
                 name=f'Max capacity investment for wind in node {n}'
                 )
             for n in range(len(self.data.nodes))
-            }
+            } #tried
 
         self.constraints.upper_level_max_investment_budget= self.model.addConstr(
             gp.quicksum(Investment_data.iloc[0,1]*self.variables.cap_invest_conv[n]+
                         Investment_data.iloc[1,1]*self.variables.cap_invest_PV[n]+
                         Investment_data.iloc[2,1]*self.variables.cap_invest_Wind[n]  for n in range(len(self.data.nodes))) <= K,
-            name = 'Budget limit')
+            name = 'Budget limit')  #tried
         
 
 
