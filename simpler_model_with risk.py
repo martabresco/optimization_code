@@ -25,7 +25,7 @@ from data_gpt import (
 )
 
 nodes = list(range(1, 25))
-K = 1.6e10  #in dollars, max investment budget
+#K = 1.6e10  #in dollars, max investment budget
 cand_Conv_cost=7.24;
 
 class Expando(object):
@@ -267,7 +267,7 @@ class Optimal_Investment:
         }
 
     def _build_upper_level_constraint(self):
-        K = 1.6e9 # budget 
+        K = 6e8 # budget    8e8 = invest in con and PV,  
         # Maximum capacity investment for conventional units at each node
         self.constraints.upper_level_max_inv_conv = {
             n: self.model.addConstr(
@@ -555,7 +555,7 @@ class Optimal_Investment:
 
         # Update objective function
         self.model.setObjective(
-            investment_cost - production_revenue + beta * risk_term,
+            investment_cost - (1-beta)*production_revenue + beta * risk_term,
             GRB.MINIMIZE
         )
 
@@ -573,15 +573,7 @@ class Optimal_Investment:
               
     
     
-    # def _build_model(self):
-    #     self.model = gp.Model(name="Bilevel Offering Strategy")
-    #     self._build_variables()
-    #     self._build_upper_level_constraint()
-    #     # self._build_kkt_primal_constraints()  # Define primal constraints for KKT conditions
-    #     # self._build_kkt_first_order_constraints()  # First-order KKT conditions
-    #     # self._build_kkt_complementarity_conditions()  # Complementarity conditions
-    #     self._build_objective_function()  # Define the objective function
-    #     self.model.update()  # Update the model with all changes
+
         
     def _save_results(self):
         # Save the objective value
@@ -618,51 +610,7 @@ class Optimal_Investment:
             if self.variables.node_bin[n].x > 0:
                 print(f"  - Investment Active in Node")
         
-        # # Production Results
-        # print("\nProduction Results:")
-        # print("New Conventional Production:")
-        # for (w, h, n), var in self.variables.prod_new_conv_unit.items():
-        #     if var.x > 0:
-        #         print(f"Scenario {w}, Hour {h}, Node {n}: {var.x:.2f} MW")
-        
-        # print("\nPV Production:")
-        # for (w, h, n), var in self.variables.prod_PV.items():
-        #     if var.x > 0:
-        #         print(f"Scenario {w}, Hour {h}, Node {n}: {var.x:.2f} MW")
-        
-        # print("\nWind Production:")
-        # for (w, h, n), var in self.variables.prod_wind.items():
-        #     if var.x > 0:
-        #         print(f"Scenario {w}, Hour {h}, Node {n}: {var.x:.2f} MW")
-        
-        # print("\nExisting Conventional Production:")
-        # for (w, h, n, u), var in self.variables.prod_existing_conv.items():
-        #     if var.x > 0:
-        #         print(f"Scenario {w}, Hour {h}, Node {n}, Unit {u}: {var.x:.2f} MW")
-        
-        # print("\nExisting Rival Production:")
-        # for (w, h, n, u), var in self.variables.prod_existing_rival.items():
-        #     if var.x > 0:
-        #         print(f"Scenario {w}, Hour {h}, Node {n}, Unit {u}: {var.x:.2f} MW")
-        
-        # print("\nNew Rival Conventional Production:")
-        # for (w, h, n), var in self.variables.prod_new_conv_rival.items():
-        #     if var.x > 0:
-        #         print(f"Scenario {w}, Hour {h}, Node {n}: {var.x:.2f} MW")
-        
-        # # Demand Served
-        # print("\nDemand Served:")
-        # for (w, h, n), var in self.variables.demand_consumed.items():
-        #     if var.x > 0:
-        #         print(f"Scenario {w}, Hour {h}, Node {n}: {var.x:.2f} MW")
-        
-        # # Voltage Angles
-        # print("\nVoltage Angles:")
-        # for (w, h, n), var in self.variables.voltage_angle.items():
-        #     print(f"Scenario {w}, Hour {h}, Node {n}: Voltage Angle = {var.x:.4f} radians")
-
-
-    
+  
     
 
 

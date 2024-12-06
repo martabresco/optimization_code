@@ -397,7 +397,7 @@ class Optimal_Investment():
         
         ##### Need to fix the last one for the existing generation costs. 
     def _build_objective_function(self):
-       probability_scenario = [0.4 for _ in range(16)] ##### must be canged to the ones for each scenario!!
+        probability_scenario = [0.4 for _ in range(16)] ##### must be canged to the ones for each scenario!!
         objective = (
             quicksum(Investment_data.iloc[0,1]*self.variables.cap_invest_conv(n) for n in self.data.nodes)
             + Investment_data.iloc[1,1]*self.variables.PV_invest_bin(n)
