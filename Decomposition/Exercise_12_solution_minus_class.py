@@ -67,20 +67,17 @@ def build_subproblem_variables(m, DA_prices_3d):
 
 
 def build_subproblem_objective(m, variables, DA_prices_3d, generation_existing_cost):
-    
-
-    """Builds the objective function for the subproblem."""
     objective = 20 * 365 * gb.quicksum(
         gb.quicksum(
             gb.quicksum(
-                (DA_prices_3d[w][t, n] * ((variables['wind_production'][w, t] if n == 13 else 0)
-                    + variables['existing_production'][n, w, t]
-                ) - variables['existing_production'][n, w, t] * generation_existing_cost[n])
-                for n in range(24)  # Assuming there are 24 nodes
+                (DA_prices_3d[str(w)][t, n] * ((variables['wind_production'][w, t] if n == 13 else 0)
+                    + variables['existing_production'][n, w, t])
+                 - variables['existing_production'][n, w, t] * generation_existing_cost[n])
+                for n in range(24)
             )
-            for t in range(24)  # Assuming there are 24 hours
+            for t in range(24)
         )
-        for w in range(len(DA_prices_3d))  # Looping over all scenarios w
+        for w in range(len(DA_prices_3d))
     )
 
     m.setObjective(objective, gb.GRB.MINIMIZE)
@@ -220,6 +217,7 @@ start = timeit.timeit()  # Define start time
 
 # Build master problem
 master = {}
+master['iteration'] = 1
 master['model'] = gb.Model(name='master')
 master['variables'] = build_master_variables(master['model'], benders_type='multi-cut', DA_prices_3d=DA_prices_3d)
 master['constraints'] = build_master_constraints(master['model'], master['variables'])
