@@ -237,12 +237,12 @@ DA_prices_3d = {sheet_name: sheet_data.values for sheet_name, sheet_data in DA_p
 
 # Accessing individual sheets as numpy array-like structures
 print("Accessing one sheet as a numpy array-like structure:")
-print(DA_prices_3d['Scenario 1'])  # Replace with the actual sheet name if different
+print(DA_prices_3d['0'])  # Replace with the actual sheet name if different
 
 # Create a 3D numpy array (num_sheets x rows x columns)
-DA_prices_array = np.array([DA_prices_3d[f"Scenario {i}"] for i in range(1, 3)])  # Adjust range if needed
-print("3D Numpy array structure of all scenarios:")
-print(DA_prices_array)
+# DA_prices_array = np.array([DA_prices_3d[i] for i in range(0, 2)])  # Adjust range if needed
+# print("3D Numpy array structure of all scenarios:")
+# print(DA_prices_array)
 
 
 

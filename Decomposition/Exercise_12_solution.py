@@ -33,8 +33,8 @@ font = {'family': 'times new roman',
 BENDERS_TYPES = ['unit-cut','multi-cut'] # types of benders algorithm
 #CONTROLLABLE_GENERATORS = ['G1','G3'] #range of controllable generators
 #WIND_GENERATORS = ['G2'] #range of wind generators
-GENERATORS = ['G1','G2','G3'] #range of all generators
-LOADS = ['D1'] #range of Loads
+# GENERATORS = ['G1','G2','G3'] #range of all generators
+# LOADS = ['D1'] #range of Loads
 #SCENARIOS = ['S1','S2','S3','S4'] # range of wind production scenarios
 
 
@@ -42,11 +42,11 @@ LOADS = ['D1'] #range of Loads
 generation_existing_cost = investor_generation_data["Bid price [$/MWh]"] 
 #adjustment_cost_up = {'G1':dispatch_cost['G1']+2,'G2':dispatch_cost['G2']+2,'G3':dispatch_cost['G3']+2} # costs for upward adjustments in real time (c^up_i) in DKK/MWh
 #adjustment_cost_down = {'G1':dispatch_cost['G1']-1,'G2':dispatch_cost['G2']-1,'G3':dispatch_cost['G3']-1} # costs for downward adjustments in real time (c^dw_i) in DKK/MWh
-generation_capacity =  investor_generation_data["Pmax [MWh]"]  # Generators capacity (Q^G_i) in MW
+generation_capacity =  investor_generation_data["Pmax [MW]"]  # Generators capacity (Q^G_i) in MW
 #adjustment_capacity_up = {'G1':10,'G2':150,'G3':50} # upward adjustment capacity (Q^up_i) in MW
 #adjustment_capacity_down = {'G1':10,'G2':150,'G3':50} # downward adjustment capacity (Q^dw_i) in MW
 #wind_availability_scenario = {('G2','S1'):0.6,('G2','S2'):0.7,('G2','S3'):0.75,('G2','S4'):0.85} # scenarios of available wind production -
-scenario_probability = DA_prices_3d # probability of scenarios of available wind production -
+#scenario_probability = DA_prices_3d # probability of scenarios of available wind production -
 #load_capacity = {'D1':200} # inflexible load consumption
 
 #%%
@@ -89,18 +89,18 @@ class benders_subproblem: # Class representing the subproblems for each scenario
         m = self.model
         
         # complicating variables
-        self.variables.inv_cap_wind = {m.addVar(lb=0,ub=150,name='Investment Capacity Wind')} # electricity production of generators (x^G_i)
+        self.variables.inv_cap_wind = m.addVar(lb=0,ub=250,name='Investment Capacity Wind') # electricity production of generators (x^G_i)
 
         # subproblem variables
         self.variables.wind_production = {
-            (w, t): m.addVar(lb=0, name=f'wind production for scenario {w} in hour {t}')
+            (w, t): m.addVar(lb=0, ub=250, name=f'wind production for scenario {w} in hour {t}')
             for w in range(len(DA_prices_3d))
             for t in range(24)  # 0 to 23 inclusive, so use range(24)
         }
         
         
         self.variables.existing_production = {
-            (n, w, t): m.addVar(lb=0,name=f'wind production for scenario {w} in hour {t}')
+            (n, w, t): m.addVar(lb=0,ub=investor_generation_data.loc[n,"Pmax [MW]"],name=f'wind production for scenario {w} in hour {t}')
             for n in range(24)  # 0 to 23 inclusive, so use range(24)
             for w in range(len(DA_prices_3d))
             for t in range(24)  # 0 to 23 inclusive, so use range(24)
@@ -114,13 +114,24 @@ class benders_subproblem: # Class representing the subproblems for each scenario
         #index shortcut 
         m = self.model
 
-        # Set the objective function for the suproblem
-        subproblem_objective =20*365* gb.quicksum(gb.quicksum(gb.quicksum(probability_scenario[w]*(DA_prices_3d(n,w,t)(self.variables.wind_production(w,t)+self.variables.existing_production(n,w,t))
-                                                                                                   - self.variables.existing_production(n,w,t)* generation_existing_cost(n)
-                                                                                                   for n in range(24)))
-                                                                          for t in range(24))
-                                                              for w in range(len(DA_prices_3d))) # expected electricity production cost (z)   
-                                                              
+                                                            
+        subproblem_objective = 20 * 365 * gb.quicksum(
+            gb.quicksum(
+                gb.quicksum(
+                    (DA_prices_3d[w][t, n] * (
+                        # Include wind production only if n == 13 (i.e., node 13)
+                        (self.variables.wind_production[w, t] if n == 13 else 0) 
+                        + self.variables.existing_production[n, w, t]
+                    ) - self.variables.existing_production[n, w, t] * generation_existing_cost[n])
+                    for n in range(24)  # Assuming there are 24 nodes
+                )
+                for t in range(24)  # Assuming there are 24 hours
+            )
+            for w in DA_prices_3d.keys()  # Looping over all scenarios w
+        )
+                
+        
+        
         m.setObjective(subproblem_objective, gb.GRB.MINIMIZE) #minimize cost
 
         m.update() 
@@ -134,7 +145,8 @@ class benders_subproblem: # Class representing the subproblems for each scenario
         self.constraints.wind_upper_limit_constraint = m.addConstrs(
             (
                 self.variables.wind_production[w, t]
-                <= Wind_PF_data[t] * self.variables.inv_cap_wind[w, t]
+                <=250
+                #<= Wind_PF_data[t] * self.variables.inv_cap_wind.x[w, t]
                 for w in range(len(DA_prices_3d))  # Loop over scenarios
                 for t in range(24)  # Loop over hours
             ),
@@ -144,8 +156,8 @@ class benders_subproblem: # Class representing the subproblems for each scenario
         
         self.constraints.existing_upper_limit_constraint = m.addConstrs(
             (
-                self.variables.existing_production(n, w, t)
-                <= generation_capacity(n)
+                self.variables.existing_production[n, w, t]
+                <= generation_capacity[n]
                 for n in range(24)
                 for w in range(len(DA_prices_3d))  # Loop over scenarios
                 for t in range(24)  # Loop over hours
@@ -166,7 +178,7 @@ class benders_subproblem: # Class representing the subproblems for each scenario
         # index shortcut
         m = self.model
 
-        self.constraints.fix_wind_cap.rhs = self.master.variables.generator_dispatch.x#-------------------------------------------------------------------------------------------------------------------------------
+        self.constraints.fix_wind_cap.rhs = self.master.variables.inv_cap_wind.x#-------------------------------------------------------------------------------------------------------------------------------
     
         m.update()
 
@@ -192,7 +204,7 @@ class benders_master: # class of master problem
         self.data.upper_bounds = {} # initialize list of upper-bound values
         self.data.lower_bounds = {} # initialize list of lower-bound values
         self.data.inv_cap_wind_sensitivity = {} # initialize list of sensitivities values
-        self.data.generator_dispatch_values = {} # initialize list of complicating variables values
+        self.data.inv_cap_wind_values = {} # initialize list of complicating variables values
         self.data.gamma_values = {} # initialize list of gamma values
         self.data.subproblem_objectives = {} # initialize list of subproblems objective values
         self.data.master_objectives = {} # initialize list of master problem objective values
@@ -212,7 +224,7 @@ class benders_master: # class of master problem
         m = self.model
         
         # complicating variables
-        self.variables.inv_cap_wind = {m.addVar(lb=0,ub=150,name='Investment Capacity Wind')} # electricity production of generators (x^G_i)
+        self.variables.inv_cap_wind = m.addVar(lb=0,ub=250,name='Investment Capacity Wind') # electricity production of generators (x^G_i)
 
 
         # gamma = approximator of subproblems' objective value
@@ -232,23 +244,23 @@ class benders_master: # class of master problem
 
         # Set the objective function for the master problem
         if self.data.benders_type == 'uni-cut':
-            master_objective = Investment_data[2,1]*self.variables.inv_cap_wind - self.variables.gamma # expected electricity production cost (z)
+            master_objective = Investment_data.iloc[2,1]*self.variables.inv_cap_wind - self.variables.gamma # expected electricity production cost (z)
             
         if self.data.benders_type == 'multi-cut':
-            master_objective =Investment_data[2,1]*self.variables.inv_cap_wind - gb.quicksum(probability_scenario[w]*self.variables.gamma[w] for w in range(len(DA_prices_3d))) # expected electricity production cost (z)   
+            master_objective =Investment_data.iloc[2,1]*self.variables.inv_cap_wind - gb.quicksum(probability_scenario[w]*self.variables.gamma[w] for w in range(len(DA_prices_3d))) # expected electricity production cost (z)   
         m.setObjective(master_objective, gb.GRB.MINIMIZE) #minimize cost
 
         m.update() 
 
     def _build_constraints(self): # build constraints
 
-        K=450621600
+        K=5e5
         #index shortcut 
         m = self.model
             
         # add constraints related to complicating constraints
         self.constraints.DA_balance_constraint = m.addConstr(
-                Investment_data[2,1]*self.variables.inv_cap_wind,
+                Investment_data.iloc[2,1]*self.variables.inv_cap_wind,
                 gb.GRB.LESS_EQUAL,
                 K,name='maximum investment') # day-ahead balance equation
 
@@ -264,7 +276,7 @@ class benders_master: # class of master problem
 
 
     def _update_master_cut(self): # fucntion tat adds cuts to master problem
-
+        print("xxxxxxxxxxxxx itertion",self.data.iteration)
         # index shortcut
         m = self.model
 
@@ -272,7 +284,9 @@ class benders_master: # class of master problem
             self.constraints.master_cuts[self.data.iteration] = m.addConstr(
                 self.variables.gamma,
                 gb.GRB.GREATER_EQUAL,
-                gb.quicksum(scenario_probability[s]*(self.data.subproblem_objectives[self.data.iteration-1][s] + gb.quicksum(self.data.inv_cap_wind_sensitivity[self.data.iteration-1][g,s]*(self.variables.generator_dispatch[g]-self.data.generator_dispatch_values[self.data.iteration-1][g]) for g in GENERATORS)) for s in SCENARIOS),
+                gb.quicksum(probability_scenario[w]*(self.data.subproblem_objectives[self.data.iteration-1][w] 
+                                                     + self.data.inv_cap_wind_sensitivity[self.data.iteration-1][w]*(self.variables.inv_cap_wind-self.data.inv_cap_wind_values[self.data.iteration-1]))  
+                                                     for w in range(len(DA_prices_3d))),
                 name='new (uni)-cut at iteration {0}'.format(self.data.iteration))
 
         if self.data.benders_type == 'multi-cut': 
@@ -280,8 +294,9 @@ class benders_master: # class of master problem
                 self.constraints.master_cuts[self.data.iteration,w] = m.addConstr(
                     self.variables.gamma[w],
                     gb.GRB.GREATER_EQUAL,
-                    self.data.subproblem_objectives[self.data.iteration-1][w] + gb.quicksum(self.data.inv_cap_wind_sensitivity[self.data.iteration-1][g,s]*(self.variables.generator_dispatch[g]-self.data.generator_dispatch_values[self.data.iteration-1][g]) for g in GENERATORS),
-                    name='new (multi)-cut for subproblem {0} at iteration {1}'.format(s,self.data.iteration))
+                    self.data.subproblem_objectives[self.data.iteration-1][w] 
+                    + gb.quicksum(self.data.inv_cap_wind_sensitivity[self.data.iteration-1][w]*(self.variables.inv_cap_wind-self.data.inv_cap_wind_values[self.data.iteration-1]) ),
+                    name='new (multi)-cut for subproblem {0} at iteration {1}'.format(w,self.data.iteration))
 
         m.update()
     
@@ -291,14 +306,16 @@ class benders_master: # class of master problem
         # index shortcut
         m = self.model
         
+        print("XXXXXXX",self.variables.inv_cap_wind.x)
+        
         # save complicating variables value
-        self.data.generator_dispatch_values[self.data.iteration] = {g:self.variables.generator_dispatch[g].x for g in GENERATORS}
+        self.data.inv_cap_wind_values[self.data.iteration] = self.variables.inv_cap_wind.x
         
         # save gamma value
         if self.data.benders_type == 'uni-cut':
             self.data.gamma_values[self.data.iteration] = self.variables.gamma.x
         if self.data.benders_type == 'multi-cut':
-            self.data.gamma_values[self.data.iteration] = {s:self.variables.gamma[s].x for s in SCENARIOS}           
+            self.data.gamma_values[self.data.iteration] = {w:self.variables.gamma[w].x for w in range(len(DA_prices_3d))}           
         
         # save lower bound value
         self.data.lower_bounds[self.data.iteration] = m.ObjVal
@@ -307,7 +324,7 @@ class benders_master: # class of master problem
         if self.data.benders_type == 'uni-cut':
             self.data.master_objectives[self.data.iteration] = m.ObjVal - self.variables.gamma.x
         if self.data.benders_type == 'multi-cut':
-            self.data.master_objectives[self.data.iteration] = m.ObjVal -sum(scenario_probability[s]*self.variables.gamma[s].x for s in SCENARIOS)           
+            self.data.master_objectives[self.data.iteration] = m.ObjVal -sum(probability_scenario[w]*self.variables.gamma[w].x for w in range(len(DA_prices_3d)))           
 
         
         m.update()
@@ -318,13 +335,13 @@ class benders_master: # class of master problem
         m = self.model
 
         # save sensitivities (for each complicating variables in each subproblem)
-        self.data.inv_cap_wind_sensitivity[self.data.iteration] = {(g,s):self.subproblem[s].constraints.fix_generator_dispatch[g].Pi for g in GENERATORS for s in SCENARIOS}
+        self.data.inv_cap_wind_sensitivity[self.data.iteration] = {(w):self.subproblem[w].constraints.fix_wind_cap.Pi  for w in range(len(DA_prices_3d))}
         
         # save subproblems objective values
-        self.data.subproblem_objectives[self.data.iteration] = {s:self.subproblem[s].model.ObjVal for s in SCENARIOS}             
+        self.data.subproblem_objectives[self.data.iteration] = {w:self.subproblem[w].model.ObjVal for w in range(len(DA_prices_3d))}             
         
         # save upper bound value
-        self.data.upper_bounds[self.data.iteration] = self.data.master_objectives[self.data.iteration] + sum(scenario_probability[s]*self.subproblem[s].model.ObjVal for s in SCENARIOS)
+        self.data.upper_bounds[self.data.iteration] = self.data.master_objectives[self.data.iteration] + sum(probability_scenario[w]*self.subproblem[w].model.ObjVal for w in range(len(DA_prices_3d))) ##################################
                       
         m.update()
 
@@ -332,55 +349,76 @@ class benders_master: # class of master problem
         
         # index shortcut
         m = self.model
-
+        
+        m.setParam('Presolve', 2)  # Enables presolve with bound tightening
+        m.setParam('Cuts', 2)  # Enable cutting planes for improved bounds
+    
         self.data.iteration += 1 # go to next iteration        
         self._update_master_cut() # add cut
         m.optimize() # optimize master problem
+        if m.status == GRB.OPTIMAL:
+            print(f"Optimal value of inv_cap_wind: {self.variables.inv_cap_wind.x}")
+        elif m.status == GRB.INFEASIBLE:
+            print("Model is infeasible.")
+        else:
+            print("Model is unbounded or another issue occurred.")
+        
         self._save_master_data() # save master problem optimization results
-        for s in SCENARIOS: 
-            self.subproblem[s]._update_complicating_variables() # update value of complicating constraints in subproblems
-            self.subproblem[s].model.optimize() # solve subproblems
+        for w in range(len(DA_prices_3d)): 
+            self.subproblem[w]._update_complicating_variables() # update value of complicating constraints in subproblems
+            self.subproblem[w].model.optimize() # solve subproblems
         self._save_subproblems_data() # save subproblems optimization results
+
 
                
     def _benders_iterate(self): # function that solves iteratively the benders algorithm
-
+        
         # index shortcut            
         m = self.model
+        m.setParam('Presolve', 2)  # Enables presolve with bound tightening
+        m.setParam('Cuts', 2)  # Enable cutting planes for improved bounds
         
         # initial iteration: 
-        m.optimize() #   solve master problem (1st iteration)
+        m.optimize() # solve master problem (1st iteration)
+        if m.status == GRB.OPTIMAL:
+            print(f"Optimal value of inv_cap_wind: {self.variables.inv_cap_wind.x}")
+        elif m.status == GRB.INFEASIBLE:
+            print("Model is infeasible.")
+        else:
+            print("Model is unbounded or another issue occurred.")
+        
         self._save_master_data() # save results of master problem and lower bound
         self._build_subproblems() # build subproblems (1st iteration)
-        for s in SCENARIOS: 
-            self.subproblem[s].model.optimize() # solve subproblems
+        for w in range(len(DA_prices_3d)): 
+            self.subproblem[w].model.optimize() # solve subproblems
         self._save_subproblems_data() # save results of subproblems and upper bound
-
+    
         # do benders steps until convergence
         while (
             (abs(self.data.upper_bounds[self.data.iteration] - self.data.lower_bounds[self.data.iteration])>self.data.epsilon and
                 self.data.iteration < self.data.max_iters)):
             self._do_benders_step()
 
+
 #%% solve and print results for uni-cut
 
-start = timeit.timeit() # define start time
+# start = timeit.timeit() # define start time
 
-DA_model = benders_master(benders_type='uni-cut',epsilon=0.1,max_iters=100)
-DA_model._benders_iterate()
+# DA_model = benders_master(benders_type='uni-cut',epsilon=0.1,max_iters=100)
+# DA_model._benders_iterate()
 
-end = timeit.timeit() # define end time
+# end = timeit.timeit() # define end time
 
-print('uni-cut solving time',end-start) # print solving time
+# print('uni-cut solving time',end-start) # print solving time
 
-print('uni-cut optimal cost',DA_model.data.upper_bounds[DA_model.data.iteration]) # print optimal cost (last upper-bound)
+# print('uni-cut optimal cost',DA_model.data.upper_bounds[DA_model.data.iteration]) # print optimal cost (last upper-bound)
 
-f, ax=plt.subplots(figsize=(10,10)) # print upper and lower bounds evolution at each iteration
-ax.plot(range(1,DA_model.data.iteration),[DA_model.data.upper_bounds[it] for it in range(1,DA_model.data.iteration)],label='upper-bound',linewidth=2,marker='o',color='red') # upper bounds at each iteration
-ax.plot(range(1,DA_model.data.iteration),[DA_model.data.lower_bounds[it] for it in range(1,DA_model.data.iteration)],label='lower-bound',linewidth=2,marker='o',color='blue') # lower bounds at each iteration
-ax.set_ylabel('Bounds (DKK)',fontsize=size_pp+5) 
-ax.set_xlabel('Iterations',fontsize=size_pp+5) 
-ax.legend(bbox_to_anchor=(0.75,1),bbox_transform=plt.gcf().transFigure,ncol=2,fontsize=size_pp+5)
+# f, ax=plt.subplots(figsize=(10,10)) # print upper and lower bounds evolution at each iteration
+# ax.plot(range(1,DA_model.data.iteration),[DA_model.data.upper_bounds[it] for it in range(1,DA_model.data.iteration)],label='upper-bound',linewidth=2,marker='o',color='red') # upper bounds at each iteration
+# ax.plot(range(1,DA_model.data.iteration),[DA_model.data.lower_bounds[it] for it in range(1,DA_model.data.iteration)],label='lower-bound',linewidth=2,marker='o',color='blue') # lower bounds at each iteration
+# ax.set_ylabel('Bounds (DKK)',fontsize=size_pp+5) 
+# ax.set_xlabel('Iterations',fontsize=size_pp+5) 
+# ax.legend(bbox_to_anchor=(0.75,1),bbox_transform=plt.gcf().transFigure,ncol=2,fontsize=size_pp+5)
 
 
 #%% solve and print results for multi-cut
