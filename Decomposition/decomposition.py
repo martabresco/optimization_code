@@ -90,7 +90,7 @@ class benders_subproblem: # Class representing the subproblems for each scenario
         
         # complicating variables
         self.variables.inv_cap_wind = m.addVar(lb=0,ub=250,name='Investment Capacity Wind') # electricity production of generators (x^G_i)
-
+    
         # subproblem variables
         self.variables.wind_production = {
             (w, t): m.addVar(lb=0, ub=250, name=f'wind production for scenario {w} in hour {t}')
@@ -119,7 +119,7 @@ class benders_subproblem: # Class representing the subproblems for each scenario
             gb.quicksum(
                 gb.quicksum(
                     (DA_prices_3d[str(w)][t, n] * (
-                        (self.variables.wind_production[w, t] if n == 'Wind' else 0)
+                        (self.variables.wind_production[w, t] if n == 13 else 0)
                         + self.variables.existing_production[n, w, t]
                     ) - self.variables.existing_production[n, w, t] * generation_existing_cost[n])
                     for n in range(len(investor_generation_data))  # Loop over all nodes
@@ -129,9 +129,6 @@ class benders_subproblem: # Class representing the subproblems for each scenario
             for w in range(len(DA_prices_3d))  # Loop over all scenarios
         )
 
-                
-        
-        
         m.setObjective(subproblem_objective, gb.GRB.MINIMIZE) #minimize cost
 
         m.update() 
@@ -145,7 +142,7 @@ class benders_subproblem: # Class representing the subproblems for each scenario
         self.constraints.wind_upper_limit_constraint = m.addConstrs(
             (
                 self.variables.wind_production[w, t]
-                <= Wind_PF_data[t,1] * self.variables.inv_cap_wind
+                <= Wind_PF_data.iloc[t,1] * self.variables.inv_cap_wind
                 for w in range(len(DA_prices_3d))  # Loop over scenarios
                 for t in range(24)  # Loop over hours
             ),
@@ -164,10 +161,11 @@ class benders_subproblem: # Class representing the subproblems for each scenario
             name='set upper bound for existing production'
         )
         
-        self.constraints.fix_wind_cap = {m.addConstr( # constraints that fix complicating variables to master problem solutions
-                        self.variables.inv_cap_wind,
-                        gb.GRB.EQUAL,
-                        self.data.inv_cap_wind_init,name='fix inv wind cap variable')}
+        self.constraints.fix_wind_cap = m.addConstr(
+            self.variables.inv_cap_wind,
+            gb.GRB.EQUAL,
+            self.data.inv_cap_wind_init,
+            name='fix inv wind cap variable')
     
         m.update()
 
@@ -176,7 +174,8 @@ class benders_subproblem: # Class representing the subproblems for each scenario
 
         # index shortcut
         m = self.model
-
+        
+        # Update the right-hand side of the constraint
         self.constraints.fix_wind_cap.rhs = self.master.variables.inv_cap_wind.x#-------------------------------------------------------------------------------------------------------------------------------
     
         m.update()
@@ -224,15 +223,22 @@ class benders_master: # class of master problem
         
         # complicating variables
         self.variables.inv_cap_wind = m.addVar(lb=0,ub=250,name='Investment Capacity Wind') # electricity production of generators (x^G_i)
+        # Set an initial starting value for inv_cap_wind
+        self.variables.inv_cap_wind.start = 10  # Starting value for the first iteration
 
 
         # gamma = approximator of subproblems' objective value
         if self.data.benders_type == 'uni-cut': # one new cut per iteration
-            self.variables.gamma = m.addVar(lb=-1000,name='gamma')
+            self.variables.gamma = m.addVar(lb=-GRB.INFINITY,ub=10000, name='gamma')
             
         if self.data.benders_type == 'multi-cut': # one new cut per subproblem and per iteration
-            self.variables.gamma = {scenario:m.addVar(lb=-1000,name='gamma') for scenario in range(len(DA_prices_3d))}
+            self.variables.gamma = {scenario:m.addVar(lb=-GRB.INFINITY,ub=10000,name='gamma') for scenario in range(len(DA_prices_3d))}
+            
+            # Set an initial starting value for inv_cap_wind
+            self.variables.gamma.start = 10  # Starting value for the first iteration
 
+        
+        print("Gamma", len(DA_prices_3d))
         m.update()
     
 
@@ -450,8 +456,8 @@ class benders_master: # class of master problem
         
         # index shortcut            
         m = self.model
-        m.setParam('Presolve', 2)  # Enables presolve with bound tightening
-        m.setParam('Cuts', 2)  # Enable cutting planes for improved bounds
+        #m.setParam('Presolve', 2)  # Enables presolve with bound tightening
+        #m.setParam('Cuts', 2)  # Enable cutting planes for improved bounds
         
         # initial iteration: 
         m.optimize() # solve master problem (1st iteration)
@@ -508,6 +514,7 @@ end = timeit.timeit() # define end time
 print('multi-cut solving time',end-start) # print solving time
 
 print('multi-cut optimal cost',DA_model.data.upper_bounds[DA_model.data.iteration]) # print optimal cost (last upper-bound)
+print('end iteration',DA_model.data.iteration)
 
 f, ax=plt.subplots(figsize=(10,10)) # print upper and lower bounds evolution at each iteration
 ax.plot(range(1,DA_model.data.iteration),[DA_model.data.upper_bounds[it] for it in range(1,DA_model.data.iteration)],label='upper-bound',linewidth=2,marker='o',color='red') # upper bounds at each iteration

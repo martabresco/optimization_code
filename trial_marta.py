@@ -562,20 +562,20 @@ class Optimal_Investment():
         }
         
         # Lower level line flow constraints
-        self.constraints.lower_level_line_flow = {
-            (w, h, n): self.model.addConstr(
-                gp.quicksum(matrix_B.iloc[n,m] * self.variables.lambda_dual[(w,h,m)] for m in range(len(self.data.nodes)))
-                - gp.quicksum(matrix_B.iloc[m,n] * self.variables.lambda_dual[(w,h,m)] for m in range(len(self.data.nodes)))
-                - gp.quicksum(matrix_B.iloc[n,m] * self.variables.gamma_f[(w,h,m)] for m  in range(len(self.data.nodes)))
-                - gp.quicksum(matrix_B.iloc[m,n]  * self.variables.gamma_f[(w,h,m)] for m  in range(len(self.data.nodes)))
-                - self.variables.min_epsilon_theta[(w,h,n)]
-                + self.variables.max_epsilon_theta[(w,h,n)] == 0,
-                name=f'Lower level line flow for scenario {w}, in hour {h}, in node {n}'
-            )
-            for w in range(len(self.data.Rival_scenarios_cap))  # Rival scenarios
-            for h in range(len(self.data.hour)) # Iterating over hours
-            for n in range(len(self.data.nodes))  # Iterating over nodes
-        }
+        # self.constraints.lower_level_line_flow = {
+        #     (w, h, n): self.model.addConstr(
+        #         gp.quicksum(matrix_B.iloc[n,m] * self.variables.lambda_dual[(w,h,m)] for m in range(len(self.data.nodes)))
+        #         - gp.quicksum(matrix_B.iloc[m,n] * self.variables.lambda_dual[(w,h,m)] for m in range(len(self.data.nodes)))
+        #         - gp.quicksum(matrix_B.iloc[n,m] * self.variables.gamma_f[(w,h,m)] for m  in range(len(self.data.nodes)))
+        #         - gp.quicksum(matrix_B.iloc[m,n]  * self.variables.gamma_f[(w,h,m)] for m  in range(len(self.data.nodes)))
+        #         - self.variables.min_epsilon_theta[(w,h,n)]
+        #         + self.variables.max_epsilon_theta[(w,h,n)] == 0,
+        #         name=f'Lower level line flow for scenario {w}, in hour {h}, in node {n}'
+        #     )
+        #     for w in range(len(self.data.Rival_scenarios_cap))  # Rival scenarios
+        #     for h in range(len(self.data.hour)) # Iterating over hours
+        #     for n in range(len(self.data.nodes))  # Iterating over nodes
+        # }
         
         
     def _build_kkt_first_order_constraints(self):
@@ -584,26 +584,26 @@ class Optimal_Investment():
 
         
         # Building constraints
-        self.constraints.second_level_primal_line = {
-            (w, h, n): self.model.addLConstr(
-                (self.variables.demand_consumed[(w, h, n)]) +
-                gp.quicksum(matrix_B.iloc[n, m] * 
-                            (self.variables.theta[(w, h, n)] - self.variables.theta[(w, h, m)]) 
-                            for m in range(len(self.data.nodes))) -
-                self.variables.prod_new_conv_unit[(w, h, n)] -
-                self.variables.prod_PV[(w, h, n)] -
-                self.variables.prod_wind[(w, h, n)] -
-                (self.variables.prod_existing_conv[(w, h, n)]) -
-                (self.variables.prod_existing_rival[(w, h, n)]) -
-                self.variables.prod_new_conv_rival[(w, h, n)],
-                GRB.EQUAL,
-                0,
-                name=f'second_level_constraint_primal_line_w{w}_h{h}_n{n}'
-            )
-            for w in range(len(self.data.Rival_scenarios_cap))   # Iterating over scenarios
-            for h in range(len(self.data.hour))                 # Iterating over hours
-            for n in range(len(self.data.nodes))               # Iterating over all nodes
-        }
+        # self.constraints.second_level_primal_line = {
+        #     (w, h, n): self.model.addLConstr(
+        #         (self.variables.demand_consumed[(w, h, n)]) +
+        #         gp.quicksum(matrix_B.iloc[n, m] * 
+        #                     (self.variables.theta[(w, h, n)] - self.variables.theta[(w, h, m)]) 
+        #                     for m in range(len(self.data.nodes))) -
+        #         self.variables.prod_new_conv_unit[(w, h, n)] -
+        #         self.variables.prod_PV[(w, h, n)] -
+        #         self.variables.prod_wind[(w, h, n)] -
+        #         (self.variables.prod_existing_conv[(w, h, n)]) -
+        #         (self.variables.prod_existing_rival[(w, h, n)]) -
+        #         self.variables.prod_new_conv_rival[(w, h, n)],
+        #         GRB.EQUAL,
+        #         0,
+        #         name=f'second_level_constraint_primal_line_w{w}_h{h}_n{n}'
+        #     )
+        #     for w in range(len(self.data.Rival_scenarios_cap))   # Iterating over scenarios
+        #     for h in range(len(self.data.hour))                 # Iterating over hours
+        #     for n in range(len(self.data.nodes))               # Iterating over all nodes
+        # }
   
    
         print("after issue constraint")
