@@ -2,28 +2,19 @@ import gurobipy as gp
 from gurobipy import GRB
 import pandas as pd
 import math as m
+import numpy as np
 
 
 from data_gpt import (
     investor_generation_data,
-    rival_generation_data,
-    lines_data,
     wind_PF,
     pv_PF,
-    demand_profile,
-    demand_distribution,
-    demand_prices,
     investment_data,
-    DA_prices,
-    Df_demand,
-    Df_rival,
-    Omega_n_sets,
-    capacity_matrix,
-    susceptance_matrix
+    DA_prices
 )
 
 nodes = list(range(1, 25))
-K = 1.6e10  #in dollars, max investment budget
+K = 1.6e5  #in dollars, max investment budget
 cand_Conv_cost=7.24;
 
 class Expando(object):
@@ -36,42 +27,24 @@ class InputData:
     def __init__(
         self,
         investor_generation_data: pd.DataFrame,
-        rival_generation_data: pd.DataFrame,
-        lines_data: pd.DataFrame,
         wind_PF_data: pd.DataFrame,
         PV_PF_data: pd.DataFrame,
-        demand_profile: pd.DataFrame,
-        demand_distribution: pd.DataFrame,
-        demand_prices: pd.DataFrame,
         investment_data: pd.DataFrame,
-        DA_prices: pd.DataFrame,
-        demand_scenarios: pd.DataFrame,
-        rival_scenarios: pd.DataFrame,
-        omega_node_set: dict[int, list],
-        capacity_matrix: pd.DataFrame, #we dont care anymore (F matrix)
-        matrix_B: pd.DataFrame, #we dont care abt line transmission anymore
+        DA_prices: np.array
     ):
         self.investor_generation_data = investor_generation_data
-        self.rival_generation_data = rival_generation_data
-        self.lines_data = lines_data
         self.wind_PF_data = wind_PF_data
         self.PV_PF_data = PV_PF_data
-        self.demand_profile = demand_profile
-        self.demand_distribution = demand_distribution
-        self.demand_prices = demand_prices
         self.investment_data = investment_data
         self.DA_prices = DA_prices
-        self.demand_scenarios = demand_scenarios
-        self.rival_scenarios = rival_scenarios
-        self.omega_node_set = omega_node_set
-        self.capacity_matrix = capacity_matrix
-        self.matrix_B = matrix_B
-
+        self.nb_scenarios=DA_prices.shape[0]
 
 class Optimal_Investment:
+    
+
+    
     def __init__(self, input_data: InputData, complementarity_method: str = 'SOS1'):
         self.data = input_data  # Reference to the InputData instance
-        #self.complementarity_method = complementarity_method  # Complementarity method
         self.variables = Expando()  # Container for decision variables
         self.constraints = Expando()  # Container for constraints
         self.results = Expando()  # Container for results
@@ -82,7 +55,6 @@ class Optimal_Investment:
         
         self.run()
         self._save_results()
-        #self._build # Define constraints
 
     def _build_variables(self):
         #former lower levels
@@ -93,7 +65,7 @@ class Optimal_Investment:
                 ub=GRB.INFINITY,
                 name=f"Prod_New_Conv_Unit_Scenario{w}_Hour{h}_Node{n}"
             )
-            for w in self.data.rival_scenarios.columns  # Scenarios (columns in Df_rival)
+            for w in range(0,self.data.nb_scenarios) # Scenarios (columns in Df_rival)
             for h in range(1, 25)  # 24 hours
             for n in range(1, 25)  # Nodes
         }
@@ -105,7 +77,7 @@ class Optimal_Investment:
                 ub=GRB.INFINITY,
                 name=f"Prod_PV_Scenario{w}_Hour{h}_Node{n}"
             )
-            for w in self.data.rival_scenarios.columns
+            for w in range(0,self.data.nb_scenarios)
             for h in range(1, 25)
             for n in range(1, 25)
         }
@@ -117,7 +89,7 @@ class Optimal_Investment:
                 ub=GRB.INFINITY,
                 name=f"Prod_Wind_Scenario{w}_Hour{h}_Node{n}"
             )
-            for w in self.data.rival_scenarios.columns
+            for w in range(0,self.data.nb_scenarios)
             for h in range(1, 25)
             for n in range(1, 25)
         }
@@ -129,60 +101,13 @@ class Optimal_Investment:
                 ub=GRB.INFINITY,
                 name=f"Prod_Existing_Scenario{w}_Hour{h}_Node{n}"
             )
-            for w in self.data.rival_scenarios.columns
+            for w in range(0,self.data.nb_scenarios)
             for h in range(1, 25)
             for n in range(1, 25)
         }
 
-        # Define production variables for existing rival conventional units PR
-        self.variables.prod_existing_rival = {
-            (w, h, n): self.model.addVar(
-                lb=0,
-                ub=GRB.INFINITY,
-                name=f"Prod_Existing_Rival_Scenario{w}_Hour{h}_Node{n}"
-            )
-            for w in self.data.rival_scenarios.columns
-            for h in range(1, 25)
-            for n in range(1, 25)
-        }
 
-        # Define production variables for new rival conventional units PR_nwt
-        self.variables.prod_new_conv_rival = {
-            (w, h, n): self.model.addVar(
-                lb=0,
-                ub=GRB.INFINITY,
-                name=f"Prod_New_Conv_Rival_Scenario{w}_Hour{h}_Node{n}"
-            )
-            for w in self.data.rival_scenarios.columns
-            for h in range(1, 25)
-            for n in range(1, 25)
-        }
-
-        # Define electricity consumption variables for demand
-        self.variables.demand_consumed = {
-            (w, h, n): self.model.addVar(
-                lb=0,
-                ub=GRB.INFINITY,
-                name=f"Demand_Consumed_Scenario{w}_Hour{h}_Node{n}"
-            )
-            for w in self.data.demand_scenarios.columns
-            for h in range(1, 25)
-            for n in range(1, 25)
-        }
-
-        # Define voltage angle variables - NOT NEEDED ANYMORE
-        # self.variables.voltage_angle = {
-        #     (w, h, n): self.model.addVar(
-        #         lb=-m.pi,
-        #         ub=m.pi,
-        #         name=f"Voltage_Angle_Scenario{w}_Hour{h}_Node{n}"
-        #     )
-        #     for w in self.data.demand_scenarios.columns
-        #     for h in range(1, 25)
-        #     for n in range(1, 25)
-        # }
-
-        # Define investment decision variables#xnc
+        # Define investment decision variables   #xnc
         self.variables.cap_invest_conv = {
             n: self.model.addVar(
                 lb=0,
@@ -299,27 +224,6 @@ class Optimal_Investment:
             name="Investment budget limit"
         )
         
-        # Power balance constraints - NOT NEEDED ANY MORE
-        # self.constraints.power_balance = {
-        #     (w, h, n): self.model.addConstr(
-        #         self.variables.demand_consumed[w, h, n] +
-        #         gp.quicksum(
-        #             self.data.matrix_B.iloc[n - 1, m - 1] * 
-        #             (self.variables.voltage_angle[w, h, n] - self.variables.voltage_angle[w, h, m])
-        #             for m in range(1, 25) if m != n
-        #         ) -
-        #         self.variables.prod_new_conv_unit[w, h, n] -
-        #         self.variables.prod_PV[w, h, n] -
-        #         self.variables.prod_wind[w, h, n] -
-        #         self.variables.prod_existing_conv[w, h, n] -
-        #         self.variables.prod_existing_rival[w, h, n] -
-        #         self.variables.prod_new_conv_rival[w, h, n] == 0,
-        #         name=f"Power balance at node {n}, scenario {w}, hour {h}"
-        #     )
-        #     for w in self.data.rival_scenarios.columns  # Scenarios
-        #     for h in range(1, 25)  # Hours
-        #     for n in range(1, 25)  # Nodes
-        # }
         
         # Production limits for new conventional units
         self.constraints.production_limits_con = {
@@ -327,7 +231,7 @@ class Optimal_Investment:
                 self.variables.prod_new_conv_unit[w, h, n] <= self.variables.cap_invest_conv[n],
                 name=f"Prod limit for new conv. unit at node {n}, scenario {w}, hour {h}"
             )
-            for w in self.data.rival_scenarios.columns
+            for w in range(0,self.data.nb_scenarios)
             for h in range(1, 25)
             for n in range(1, 25)
         }
@@ -339,7 +243,7 @@ class Optimal_Investment:
                 self.data.PV_PF_data.iloc[h - 1, 1] * self.variables.cap_invest_PV[n],
                 name=f"Prod limit for PV at node {n}, scenario {w}, hour {h}"
             )
-            for w in self.data.rival_scenarios.columns
+            for w in range(0,self.data.nb_scenarios)
             for h in range(1, 25)
             for n in range(1, 25)
         }
@@ -351,7 +255,7 @@ class Optimal_Investment:
                 self.data.wind_PF_data.iloc[h - 1, 1] * self.variables.cap_invest_wind[n],
                 name=f"Prod limit for wind at node {n}, scenario {w}, hour {h}"
             )
-            for w in self.data.rival_scenarios.columns
+            for w in range(0,self.data.nb_scenarios)
             for h in range(1, 25)
             for n in range(1, 25)
         }
@@ -364,96 +268,17 @@ class Optimal_Investment:
                 ].values[0],
                 name=f"Prod limit for existing conv. at node {n}, scenario {w}, hour {h}"
             )
-            for w in self.data.rival_scenarios.columns  # Iterate over scenarios
+            for w in range(0,self.data.nb_scenarios)  # Iterate over scenarios
             for h in range(1, 25)  # Iterate over hours
             for n in self.data.investor_generation_data["Node"].unique()  # Only nodes with existing generators
         }
 
 
-        # Production limits for existing rival conventional units
-        self.constraints.production_limits_existing_rival = {
-            (w, h, n): self.model.addConstr(
-                self.variables.prod_existing_rival[w, h, n] <= 
-                self.data.rival_generation_data.loc[
-                    self.data.rival_generation_data["Node"] == n, "Pmax"
-                ].values[0],  # Retrieve the Pmax value for the given node
-                name=f"Prod limit for existing rival at node {n}, scenario {w}, hour {h}"
-            )
-            for w in self.data.rival_scenarios.columns  # Iterate over scenarios
-            for h in range(1, 25)  # Iterate over hours
-            for n in self.data.rival_generation_data["Node"].unique()  # Only nodes with rival generators
-        }
-        
-                # Production limits for new rival conventional units, restricted to node 23
-        self.constraints.production_limits_new_rival = {
-            (w, h, n): self.model.addConstr(
-                self.variables.prod_new_conv_rival[w, h, n] <= self.data.rival_scenarios.loc["Capacity", w],
-                name=f"Prod limit for new rival unit at node {n}, scenario {w}, hour {h}"
-            )
-            for w in self.data.rival_scenarios.columns  # Iterate over scenario columns
-            for h in range(1, 25)  # Iterate over 24 hours
-            for n in [23]  # Restrict to node 23 only
-        }
-        
-        # Restrict new rival production to only node 23
-        self.constraints.node_limits_new_rival = {
-            (w, h, n): self.model.addConstr(
-                self.variables.prod_new_conv_rival[w, h, n] == 0,
-                name=f"Limit new rival production to node 23, scenario {w}, hour {h}, node {n}"
-            )
-            for w in self.data.rival_scenarios.columns  # Iterate over scenario columns
-            for h in range(1, 25)  # Iterate over 24 hours
-            for n in range(1, 25) if n != 23  # Apply to all nodes except node 23
-        }
-        
-        #node_to_percentage = demand_distribution.set_index(1)[2]  # Now node_to_percentage[n] gives the percentage for node n
-        # Demand limit constraint
-        self.constraints.Demand_limit = {
-            (w, h, n): self.model.addConstr(
-                self.variables.demand_consumed[w, h, n] <= 
-                self.data.demand_scenarios.loc[str(h), w] * 
-                self.data.demand_distribution.loc[
-                    self.data.demand_distribution["Node"] == n, "percent_sys_load"
-                ].values[0] / 100,
-                name=f"Demand limit for node {n}, scenario {w}, hour {h}"
-            )
-            for w in self.data.demand_scenarios.columns  # Iterate over scenario columns
-            for h in range(1, 25)  # Iterate over 24 hours
-            for n in self.data.demand_distribution["Node"].unique()  # Iterate over nodes in demand distribution
-        }
-
-    # Constraint for line power flows based on voltage angle differences and line reactance - NOT NEEDED ANYMORE
-        # self.constraints.line_power_flow = {
-        #     (w, h, n, m): self.model.addConstr(
-        #         self.data.matrix_B.loc[n, m] * (
-        #             self.variables.voltage_angle[w, h, n] - self.variables.voltage_angle[w, h, m]
-        #         ) <= self.data.capacity_matrix.loc[n, m],
-        #         name=f"Power flow on line {n}-{m}, scenario {w}, hour {h}"
-        #     )
-        #     for w in self.data.rival_scenarios.columns  # Iterate over scenario columns
-        #     for h in range(1, 25)  # Iterate over 24 hours
-        #     for n in self.data.lines_data["From"].unique()  # Iterate over 'From' nodes in lines
-        #     for m in self.data.lines_data.loc[self.data.lines_data["From"] == n, "To"]  # Iterate over 'To' nodes connected to n
-        # }
-                #Constraint to set voltage angle to 0 for the reference node (Node 1) - NOT NEEDED ANY MORE
-        # self.constraints.voltage_angle_fixed_node1 = {
-        #     (w, h): self.model.addConstr(
-        #         self.variables.voltage_angle[w, h, n] == 0,
-        #         name=f"Voltage angle fixed to 0 at Node 1, scenario {w}, hour {h}"
-        #     )
-        #     for w in self.data.rival_scenarios.columns  # Iterate over all scenario columns
-        #     for h in range(1, 25)  # Iterate over 24 hours
-        #     for n in [1]
-        # }
-
-
-
-
-
 
     def _build_objective_function(self):
         # Assuming 'probability_scenario' is a list of probabilities for each scenario
-        probability_scenario=[0.06,0.06,0.06,0.02,0.06,0.06,0.06,0.02,0.09,0.09,0.09,0.03,0.09,0.09,0.09,0.03] # Adjust based on actual probabilities if available
+        #probability_scenario=[0.06,0.06,0.06,0.02,0.06,0.06,0.06,0.02,0.09,0.09,0.09,0.03,0.09,0.09,0.09,0.03] # Adjust based on actual probabilities if available
+        probability_scenario=1/20
     
         investment_cost = gp.quicksum(
             self.data.investment_data.loc[self.data.investment_data["Technology"] == "Conventional", "Inv_Cost"].values[0] * self.variables.cap_invest_conv[n] +
@@ -462,11 +287,10 @@ class Optimal_Investment:
             for n in range(1, 25)
         )
 
-        #print("prod_new_conv_unit",self.variables.prod_new_conv_unit)
-        #print("prod_existing_conv",self.variables.prod_existing_conv)
+
         production_revenue = 20*365*gp.quicksum(
-            probability_scenario[int(w[-1]) - 1] *  # Extract scenario number (0-indexed)
-            self.data.DA_prices.iloc[h - 1]["DA_prices"] *1000* (  # Adjust h for 0-indexed DA_prices
+            probability_scenario*(
+            self.data.DA_prices[w,n-1,h-1] *(  # Adjust h for 0-indexed DA_prices
                 self.variables.prod_new_conv_unit[(w, h, n)] +
                 (
                     self.variables.prod_existing_conv[(w, h, n)]
@@ -479,11 +303,13 @@ class Optimal_Investment:
             - (
                 self.variables.prod_new_conv_unit[(w, h, n)] * cand_Conv_cost  # Subtracting investment cost for new conventional units
                 + (
-                    self.variables.prod_existing_conv[(w, h, n)] * investor_generation_data.iloc[0, 1]
+                    self.variables.prod_existing_conv[(w, h, n)] * self.data.investor_generation_data.loc[
+                        self.data.investor_generation_data["Node"] == n, "Bid price"
+                    ].values[0]
                     if n in self.data.investor_generation_data["Node"].values
                     else 0  # Skip cost if there is no existing generator at node n
                 )
-            )
+            ))
             for (w, h, n) in self.variables.prod_new_conv_unit.keys() ) # Iterate over all keys
         
 
@@ -501,17 +327,6 @@ class Optimal_Investment:
        else:
            print("Optimization was not successful.")
               
-    
-    
-    # def _build_model(self):
-    #     self.model = gp.Model(name="Bilevel Offering Strategy")
-    #     self._build_variables()
-    #     self._build_upper_level_constraint()
-    #     # self._build_kkt_primal_constraints()  # Define primal constraints for KKT conditions
-    #     # self._build_kkt_first_order_constraints()  # First-order KKT conditions
-    #     # self._build_kkt_complementarity_conditions()  # Complementarity conditions
-    #     self._build_objective_function()  # Define the objective function
-    #     self.model.update()  # Update the model with all changes
         
     def _save_results(self):
         # Save the objective value
@@ -523,12 +338,7 @@ class Optimal_Investment:
             for (w, h, n) in self.variables.prod_new_conv_unit.keys()
         }
     
-        # Save load consumption
-        self.results.load_consumption = {
-            (w, h, n): self.variables.demand_consumed[w, h, n].x
-            for (w, h, n) in self.variables.demand_consumed.keys()
-        }
-        
+
     def display_results(self):
         print("\n-------------------   RESULTS  -------------------")
         
@@ -600,20 +410,10 @@ class Optimal_Investment:
 def prepare_input_data():
     return InputData(
         investor_generation_data=investor_generation_data,
-        rival_generation_data=rival_generation_data,
-        lines_data=lines_data,
         wind_PF_data=wind_PF,
         PV_PF_data=pv_PF,
-        demand_profile=demand_profile,
-        demand_distribution=demand_distribution,
-        demand_prices=demand_prices,
         investment_data=investment_data,
-        DA_prices=DA_prices,
-        demand_scenarios=Df_demand,
-        rival_scenarios=Df_rival,
-        omega_node_set=Omega_n_sets,
-        capacity_matrix=capacity_matrix,
-        matrix_B=susceptance_matrix,
+        DA_prices=DA_prices
     )
 
 if __name__ == "__main__":

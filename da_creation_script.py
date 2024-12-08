@@ -55,17 +55,18 @@ def DA_prices_creation():
             # Remplir la matrice 3D pour les prix horaires
             hourly_prices[scenario_index, node-1, :] = scenario_quantiles  # Utiliser node-1 pour l'indexation correcte
     
-    # # Créer les niveaux d'index pour le DataFrame (Scénarios, Nœuds, Heures)
-    # scenarios_index = [f'Scenario {i+1}' for i in range(20)]
-    # nodes_index = [f'Node {i+1}' for i in range(24)]
-    # hours_index = [f'Hour {i+1}' for i in range(24)]
+    # Créer les niveaux d'index pour le DataFrame (Scénarios, Nœuds, Heures)
+    scenarios_index = [f'Scenario {i+1}' for i in range(20)]
+    nodes_index = [f'Node {i+1}' for i in range(24)]
+    hours_index = [f'Hour {i+1}' for i in range(24)]
     
-    # # Convertir la matrice en DataFrame pour une structure MultiIndex
-    # hourly_prices_df = pd.DataFrame(hourly_prices.reshape(20 * 24, 24), columns=hours_index)
-    # hourly_prices_df.index = pd.MultiIndex.from_product([scenarios_index, nodes_index], names=["Scenario", "Node"])
+    # Convertir la matrice en DataFrame pour une structure MultiIndex
+    hourly_prices_df = pd.DataFrame(hourly_prices.reshape(20 * 24, 24), columns=hours_index)
+    hourly_prices_df.index = pd.MultiIndex.from_product([scenarios_index, nodes_index], names=["Scenario", "Node"])
     
     return hourly_prices #now return the numpy array but you could also retrieve the dataframe if you want
 
-
+hourly_prices=DA_prices_creation()
+print("hourly_prices", hourly_prices)
 
 
