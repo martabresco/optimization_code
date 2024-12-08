@@ -37,8 +37,8 @@ pE = model.addVars(N, Omega, T, name="pE", lb=0,
                    ub={(n): PE_max[n] for n in range(N)})
 
 # Constraints to force xW and pW to only be nonzero for node 14
-model.addConstrs((xW[n] == 0 for n in range(N) if n != 14), name="Fix_xW_others")
-model.addConstrs((pW[n, w, t] == 0 for n in range(N) if n != 14 for w in range(Omega) for t in range(T)), name="Fix_pW_others")
+model.addConstrs((xW[n] == 0 for n in range(N) if n != 13), name="Fix_xW_others")
+model.addConstrs((pW[n, w, t] == 0 for n in range(N) if n != 13 for w in range(Omega) for t in range(T)), name="Fix_pW_others")
 
 
 
