@@ -82,10 +82,8 @@ model.optimize()
 # Results
 if model.status == GRB.OPTIMAL:
     print("Optimal solution found:")
-    # Since the objective function is currently minimized, a negative value indicates profit.
-    # We'll treat the negative of the objective value as profit in dollars.
-    profit = -model.objVal
-    print(f"Profit: {profit} $")
+
+
 
     # xW is measured in MW
     for n in range(N):
