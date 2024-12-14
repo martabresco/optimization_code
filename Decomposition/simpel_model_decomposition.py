@@ -2,7 +2,7 @@ import gurobipy as gp
 from gurobipy import GRB
 import pandas as pd
 import numpy as np
-from Data import investor_generation_data, DA_prices_3d, Wind_PF_data, Investment_data
+from Data import investor_generation_data, DA_prices_3d, Wind_PF_data, Investment_data, DA_prices
 
 # Set up data
 N = 24  # Number of nodes
