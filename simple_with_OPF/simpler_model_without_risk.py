@@ -310,7 +310,57 @@ class Optimal_Investment:
             )
             for n in range(1, 25)
         }
-    
+        
+        # # Production limits for existing conventional units
+        # self.constraints.production_limits_existing_con = {
+        #     (w, h, n): self.model.addConstr(
+        #         self.variables.prod_existing_conv[w, h, n] <= 
+        #         self.data.investor_generation_data.loc[
+        #             self.data.investor_generation_data["Node"] == n, "Pmax"
+        #         ].values[0],
+        #         name=f"Prod limit for existing conv. at node {n}, scenario {w}, hour {h}"
+        #     )
+        #     for w in range(0,self.data.nb_scenarios)  # Iterate over scenarios
+        #     for h in range(1, 25)  # Iterate over hours
+        #     for n in self.data.investor_generation_data["Node"].unique()  # Only nodes with existing generators
+        # }
+
+        
+        # Get nodes present in the data
+        nodes_in_data = set(self.data.investor_generation_data["Node"].unique())
+        # Production limits for existing conventional units
+        self.constraints.production_limits_existing_con = {
+            (w, h, n): self.model.addConstr(
+                self.variables.prod_existing_conv[w, h, n] <= (
+                    self.data.investor_generation_data.loc[
+                        self.data.investor_generation_data["Node"] == n, "Pmax"
+                    ].values[0] if n in nodes_in_data else 0  # Default Pmax to 0 for unconstrained nodes
+                ),
+                name=f"Prod limit for existing conv. at node {n}, scenario {w}, hour {h}"
+            )
+            for w in range(0, self.data.nb_scenarios)  # Iterate over scenarios
+            for h in range(1, 25)  # Iterate over hours
+            for n in range(1, 25)  # Iterate over all nodes in variables
+        }
+
+        #check here, rival is producing crazy amountss....###############################################################################
+        # Production limits for existing rival units
+        # Get nodes present in the data
+        nodes_in_data = set(self.data.rival_generation_data["Node"].unique())
+        self.constraints.production_limits_existing_rival = {
+            (w, h, n): self.model.addConstr(
+                self.variables.prod_existing_rival[w, h, n] <= (
+                    self.data.rival_generation_data.loc[
+                        self.data.rival_generation_data["Node"] == n, "Pmax"
+                    ].values[0] if n in nodes_in_data else 0  # Default Pmax to 0 for unconstrained nodes
+                ),
+                name=f"Prod limit for existing rival at node {n}, scenario {w}, hour {h}"
+            )
+            for w in range(0, self.data.nb_scenarios)  # Iterate over scenarios
+            for h in range(1, 25)  # Iterate over hours
+            for n in range(1, 25)  # Iterate over all nodes in variables
+        }
+        
         # Total investment budget constraint
         self.constraints.upper_level_max_investment_budget = self.model.addConstr(
             gp.quicksum(
@@ -378,35 +428,7 @@ class Optimal_Investment:
             for h in range(1, 25)
             for n in range(1, 25)
         }
-        # Production limits for existing conventional units
-        self.constraints.production_limits_existing_con = {
-            (w, h, n): self.model.addConstr(
-                self.variables.prod_existing_conv[w, h, n] <= 
-                self.data.investor_generation_data.loc[
-                    self.data.investor_generation_data["Node"] == n, "Pmax"
-                ].values[0],
-                name=f"Prod limit for existing conv. at node {n}, scenario {w}, hour {h}"
-            )
-            for w in range(0,self.data.nb_scenarios)  # Iterate over scenarios
-            for h in range(1, 25)  # Iterate over hours
-            for n in self.data.investor_generation_data["Node"].unique()  # Only nodes with existing generators
-        }
 
-
-        # Production limits for existing rival conventional units
-        #check here, rival is producing crazy amountss....###############################################################################
-        self.constraints.production_limits_existing_rival = {
-            (w, h, n): self.model.addConstr(
-                self.variables.prod_existing_rival[w, h, n] <= 
-                self.data.rival_generation_data.loc[
-                    self.data.rival_generation_data["Node"] == n, "Pmax"
-                ].values[0],  # Retrieve the Pmax value for the given node
-                name=f"Prod limit for existing rival at node {n}, scenario {w}, hour {h}"
-            )
-            for w in range(0,self.data.nb_scenarios)  # Iterate over scenarios
-            for h in range(1, 25)  # Iterate over hours
-            for n in self.data.rival_generation_data["Node"].unique()  # Only nodes with rival generators
-        }
         
                 # Production limits for new rival conventional units, restricted to node 23
         self.constraints.production_limits_new_rival = {
@@ -577,15 +599,15 @@ class Optimal_Investment:
         #         print(f"  - Conventional Capacity existing rival: {self.variables.prod_existing_rival[1,12,n].x:.2f} MW")
         
         rival_existing_decision = np.zeros((20,24, 24))
+        inv_existing_decision = np.zeros((20,24, 24))
         
         for w in range(0,self.data.nb_scenarios):
             for h in range (1,24):
                 for n in range (1,24):
                     rival_existing_decision[w,h,n]=self.variables.prod_existing_rival[(w,h,n)].x
-                    #print(f"  - Conventional Capacity existing rival: {self.variables.prod_existing_rival.x:.2f}")
+                    inv_existing_decision[w,h,n]=self.variables.prod_existing_conv[(w,h,n)].x
                     
-                    
-        return rival_existing_decision
+        return rival_existing_decision, inv_existing_decision
         
         
         
@@ -662,7 +684,7 @@ if __name__ == "__main__":
     input_data = prepare_input_data()
     model = Optimal_Investment(input_data=input_data, complementarity_method='SOS1')
     model.run()
-    rival_existing_decision=model.display_results()
+    rival_existing_decision, inv_existing_decision=model.display_results()
 
 
 
