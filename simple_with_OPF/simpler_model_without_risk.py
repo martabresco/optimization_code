@@ -43,7 +43,7 @@ for n in demand_distribution["Node"].unique():
         profile_value = demand_profile.iloc[h, 1]
 
         # Compute and assign to Demand
-        Demand[n, h] = demand_value * profile_value
+        Demand[n, h] = demand_value * profile_value / 100  # Divide by 100 to convert percentage to fraction
         
 Strategy_rival=Df_rival["S3"] #we fix one strategy for the rival, the one of scenario 3
 
@@ -289,7 +289,7 @@ class Optimal_Investment:
     
         # Constraint allowing investment in only one node across the entire system
         self.constraints.upper_level_only_invest_one_node = self.model.addConstr(
-            gp.quicksum(self.variables.node_bin[n] for n in range(1, 25)) <= 1,
+            gp.quicksum(self.variables.node_bin[n] for n in range(1, 25)) <= 24,
             name="Only one node can have investments in the system"
         )
     
@@ -525,7 +525,7 @@ class Optimal_Investment:
             - (
                 self.variables.prod_new_conv_unit[(w, h, n)] * cand_Conv_cost  # Subtracting investment cost for new conventional units
                 + (
-                    self.variables.prod_existing_conv[(w, h, n)] * investor_generation_data.iloc[0, 1]
+                    self.variables.prod_existing_conv[(w, h, n)] * investor_generation_data.iloc[0, 3] # Correct the column to search for the right value of bid price
                     if n in self.data.investor_generation_data["Node"].values
                     else 0  # Skip cost if there is no existing generator at node n
                 )
