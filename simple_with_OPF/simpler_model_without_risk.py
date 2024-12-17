@@ -27,7 +27,7 @@ from data_simple_model import (
 
 
 nodes = list(range(1, 25))
-K = 1.6e7  #in dollars, max investment budget
+K = 1.6e10  #in dollars, max investment budget
 cand_Conv_cost=55
 
 Demand = np.zeros((24, 24))  # 24x24 numpy array
@@ -36,7 +36,7 @@ Demand = np.zeros((24, 24))  # 24x24 numpy array
 for n in demand_distribution["Node"].unique():
     for h in range(24):
         # Select the value from demand_distribution where "Node" equals n
-        demand_value = demand_distribution.loc[demand_distribution["Node"] == n, demand_distribution.columns[2]].values[0]
+        demand_value = (demand_distribution.loc[demand_distribution["Node"] == n, demand_distribution.columns[2]].values[0])/100
 
         # Access the demand_profile value for hour h
         profile_value = demand_profile.iloc[h, 1]
@@ -267,7 +267,6 @@ class Optimal_Investment:
         }
 
     def _build_upper_level_constraint(self):
-        K = 1.6e7 # budget 
         # Maximum capacity investment for conventional units at each node
         self.constraints.upper_level_max_inv_conv = {
             n: self.model.addConstr(
@@ -288,7 +287,7 @@ class Optimal_Investment:
     
         # Constraint allowing investment in only one node across the entire system
         self.constraints.upper_level_only_invest_one_node = self.model.addConstr(
-            gp.quicksum(self.variables.node_bin[n] for n in range(1, 25)) <= 1,
+            gp.quicksum(self.variables.node_bin[n] for n in range(1, 25)) <= 14,
             name="Only one node can have investments in the system"
         )
     
@@ -310,19 +309,7 @@ class Optimal_Investment:
             for n in range(1, 25)
         }
         
-        # # Production limits for existing conventional units
-        # self.constraints.production_limits_existing_con = {
-        #     (w, h, n): self.model.addConstr(
-        #         self.variables.prod_existing_conv[w, h, n] <= 
-        #         self.data.investor_generation_data.loc[
-        #             self.data.investor_generation_data["Node"] == n, "Pmax"
-        #         ].values[0],
-        #         name=f"Prod limit for existing conv. at node {n}, scenario {w}, hour {h}"
-        #     )
-        #     for w in range(0,self.data.nb_scenarios)  # Iterate over scenarios
-        #     for h in range(1, 25)  # Iterate over hours
-        #     for n in self.data.investor_generation_data["Node"].unique()  # Only nodes with existing generators
-        # }
+
 
         
         # Get nodes present in the data
@@ -371,7 +358,7 @@ class Optimal_Investment:
             name="Investment budget limit"
         )
         
-        # Power balance constraints
+        #Power balance constraints
         self.constraints.power_balance = {
             (w, h, n): self.model.addConstr(
                 Demand[h-1, n-1] +
@@ -451,24 +438,10 @@ class Optimal_Investment:
             for n in range(1, 25) if n != 23  # Apply to all nodes except node 23
         }
         
-        #node_to_percentage = demand_distribution.set_index(1)[2]  # Now node_to_percentage[n] gives the percentage for node n
-        # Demand limit constraint - now our demand is fixed so we do not need this consraint
-        # self.constraints.Demand_limit = {
-        #     (w, h, n): self.model.addConstr(
-        #         self.variables.demand_consumed[w, h, n] <= 
-        #         self.data.demand_scenarios.loc[str(h), w] * 
-        #         self.data.demand_distribution.loc[
-        #             self.data.demand_distribution["Node"] == n, "percent_sys_load"
-        #         ].values[0] / 100,
-        #         name=f"Demand limit for node {n}, scenario {w}, hour {h}"
-        #     )
-        #     for w in self.data.demand_scenarios.columns  # Iterate over scenario columns
-        #     for h in range(1, 25)  # Iterate over 24 hours
-        #     for n in self.data.demand_distribution["Node"].unique()  # Iterate over nodes in demand distribution
-        # }
+ 
 
     # Constraint for line power flows based on voltage angle differences and line reactance
-        self.constraints.line_power_flow = {
+        self.constraints.line_power_flow_upper = {
             (w, h, n, m): self.model.addConstr(
                 self.data.matrix_B.loc[n, m] * (
                     self.variables.voltage_angle[w, h, n] - self.variables.voltage_angle[w, h, m]
@@ -480,6 +453,24 @@ class Optimal_Investment:
             for n in self.data.lines_data["From"].unique()  # Iterate over 'From' nodes in lines
             for m in self.data.lines_data.loc[self.data.lines_data["From"] == n, "To"]  # Iterate over 'To' nodes connected to n
         }
+        
+        self.constraints.line_power_flow_lower = {
+            (w, h, n, m): self.model.addConstr(
+                self.data.matrix_B.loc[n, m] * (
+                    self.variables.voltage_angle[w, h, n] - self.variables.voltage_angle[w, h, m])
+                 >= -self.data.capacity_matrix.loc[n, m],
+                name=f"Power flow on line {n}-{m}, scenario {w}, hour {h}"
+            )
+            for w in range(0,self.data.nb_scenarios)  # Iterate over scenario columns
+            for h in range(1, 25)  # Iterate over 24 hours
+            for n in self.data.lines_data["From"].unique()  # Iterate over 'From' nodes in lines
+            for m in self.data.lines_data.loc[self.data.lines_data["From"] == n, "To"]  # Iterate over 'To' nodes connected to n
+        }
+        
+
+
+
+        
                 #Constraint to set voltage angle to 0 for the reference node (Node 1)
         self.constraints.voltage_angle_fixed_node1 = {
             (w, h): self.model.addConstr(
@@ -507,36 +498,70 @@ class Optimal_Investment:
             for n in range(1, 25)
         )
 
-        #print("prod_new_conv_unit",self.variables.prod_new_conv_unit)
-        #print("prod_existing_conv",self.variables.prod_existing_conv)
-        production_revenue = 20*365*gp.quicksum(
-            probability_scenario *  
-            DA_prices[w,n-1,h - 1] * (  # Adjust h for 0-indexed DA_prices
-                self.variables.prod_new_conv_unit[(w, h, n)] +
-                (
-                    self.variables.prod_existing_conv[(w, h, n)]
-                    if n in self.data.investor_generation_data["Node"].values
-                    else 0  # Skip if there is no existing generator at node n
-                ) +
-                self.variables.prod_PV[(w, h, n)] +
-                self.variables.prod_wind[(w, h, n)]
-            )
-            - (
-                self.variables.prod_new_conv_unit[(w, h, n)] * cand_Conv_cost  # Subtracting investment cost for new conventional units
-                + (
-                    self.variables.prod_existing_conv[(w, h, n)] * investor_generation_data.iloc[0, 1]
-                    if n in self.data.investor_generation_data["Node"].values
-                    else 0  # Skip cost if there is no existing generator at node n
+        production_revenue = (
+            20 * 365 * gp.quicksum(
+                gp.quicksum(
+                    gp.quicksum(
+                        probability_scenario *
+                        DA_prices[w, n - 1, h - 1] * (  # Adjust h for 0-indexed DA_prices
+                            self.variables.prod_new_conv_unit[(w, h, n)] +
+                            (
+                                self.variables.prod_existing_conv[(w, h, n)]
+                                if n in self.data.investor_generation_data["Node"].values
+                                else 0  # Skip if there is no existing generator at node n
+                            ) +
+                            self.variables.prod_PV[(w, h, n)] +
+                            self.variables.prod_wind[(w, h, n)]
+                        )
+                        - (
+                            self.variables.prod_new_conv_unit[(w, h, n)] * cand_Conv_cost  # Investment cost
+                            + (
+                                self.variables.prod_existing_conv[(w, h, n)] *
+                                self.data.investor_generation_data.loc[
+                                    self.data.investor_generation_data["Node"] == n, "Bid price"
+                                ].values[0]
+                                if n in self.data.investor_generation_data["Node"].values
+                                else 0  # Skip cost if there is no existing generator at node n
+                            )
+                        )
+                        for w in range(0, self.data.nb_scenarios)  # Iterate over all scenarios
+                    )
+                    for h in range(1, 25)  # Iterate over 24 hours
                 )
+                for n in range(1, 25)  # Iterate over all nodes
             )
-            for (w, h, n) in self.variables.prod_new_conv_unit.keys() ) # Iterate over all keys
-        
+        )
 
 
-
+         # production_revenue = 20*365*gp.quicksum(quicksum(quicksum(
+         #    probability_scenario *  
+         #    DA_prices[w,n-1,h - 1] * (  # Adjust h for 0-indexed DA_prices
+         #        self.variables.prod_new_conv_unit[(w, h, n)] +
+         #        (
+         #            self.variables.prod_existing_conv[(w, h, n)]
+         #            if n in self.data.investor_generation_data["Node"].values
+         #            else 0  # Skip if there is no existing generator at node n
+         #        ) +
+         #        self.variables.prod_PV[(w, h, n)] +
+         #        self.variables.prod_wind[(w, h, n)]
+         #    )
+         #    - (
+         #        self.variables.prod_new_conv_unit[(w, h, n)] * cand_Conv_cost  # Subtracting investment cost for new conventional units
+         #        + (
+         #            self.variables.prod_existing_conv[(w, h, n)] * self.data.investor_generation_data.loc[
+         #                self.data.investor_generation_data["Node"] == n, "Bid price"
+         #            ].values[0]
+         #            if n in self.data.investor_generation_data["Node"].values
+         #            else 0  # Skip cost if there is no existing generator at node n
+         #        )
+         #    )
+         #    for w in range(0,self.data.nb_scenarios))  # Iterate over all scenario columns
+         #    for h in range(1, 25))  # Iterate over 24 hours
+         #    for n in range(1,25)) # Iterate over all keys
     
         # Set the objective as the minimization of total cost
-        self.model.setObjective(investment_cost - production_revenue, GRB.MINIMIZE)
+        obj=investment_cost - production_revenue
+        self.model.setObjective(obj, GRB.MINIMIZE)
         
     def run(self):
        self.model.optimize()
@@ -548,15 +573,7 @@ class Optimal_Investment:
               
     
     
-    # def _build_model(self):
-    #     self.model = gp.Model(name="Bilevel Offering Strategy")
-    #     self._build_variables()
-    #     self._build_upper_level_constraint()
-    #     # self._build_kkt_primal_constraints()  # Define primal constraints for KKT conditions
-    #     # self._build_kkt_first_order_constraints()  # First-order KKT conditions
-    #     # self._build_kkt_complementarity_conditions()  # Complementarity conditions
-    #     self._build_objective_function()  # Define the objective function
-    #     self.model.update()  # Update the model with all changes
+  
         
     def _save_results(self):
         # Save the objective value
@@ -580,6 +597,7 @@ class Optimal_Investment:
         for n in range(1, 25):  # Assuming 24 nodes
             print(f"Node {n}:")
             if self.variables.cap_invest_conv[n].x > 0:
+                
                 print(f"  - Conventional Capacity: {self.variables.cap_invest_conv[n].x:.2f} MW")
             if self.variables.cap_invest_PV[n].x > 0:
                 print(f"  - PV Capacity: {self.variables.cap_invest_PV[n].x:.2f} MW")
@@ -587,6 +605,7 @@ class Optimal_Investment:
                 print(f"  - Wind Capacity: {self.variables.cap_invest_wind[n].x:.2f} MW")
             if self.variables.node_bin[n].x > 0:
                 print(f"  - Investment Active in Node")
+                
                 
         #Rival
         # print("\nIRival Decisions:")
@@ -599,14 +618,30 @@ class Optimal_Investment:
         
         rival_existing_decision = np.zeros((20,24, 24))
         inv_existing_decision = np.zeros((20,24, 24))
+        flow_result = np.zeros((20,24, 24))
+        inv_new_prod_PV = np.zeros((20,24, 24))
+        inv_new_prod_wind = np.zeros((20,24, 24))
+        inv_new_prod_conv = np.zeros((20,24, 24))
         
+
+            
         for w in range(0,self.data.nb_scenarios):
             for h in range (1,24):
                 for n in range (1,24):
                     rival_existing_decision[w,h,n]=self.variables.prod_existing_rival[(w,h,n)].x
                     inv_existing_decision[w,h,n]=self.variables.prod_existing_conv[(w,h,n)].x
+                    flow_result[w,h,n]=sum(self.data.matrix_B.iloc[n - 1, m - 1] * 
+                        (self.variables.voltage_angle[(w,h,n)].x - self.variables.voltage_angle[(w,h,m)].x)
+                        for m in range(1, 25) if m != n)
+                    inv_new_prod_PV[w,h,n]=self.variables.prod_PV[(w,h,n)].x
+                    inv_new_prod_wind[w,h,n]=self.variables.prod_wind[(w,h,n)].x
+                    inv_new_prod_conv[w,h,n]=self.variables.prod_new_conv_unit[(w,h,n)].x
                     
-        return rival_existing_decision, inv_existing_decision
+         
+        print("xxxxxxxxxxx",self.data.investment_data.loc[self.data.investment_data["Technology"] == "Conventional", "Inv_Cost"].values[0])
+
+                    
+        return rival_existing_decision, inv_existing_decision,flow_result,  inv_new_prod_conv,  inv_new_prod_wind,  inv_new_prod_PV
         
         
         
@@ -683,8 +718,9 @@ if __name__ == "__main__":
     input_data = prepare_input_data()
     model = Optimal_Investment(input_data=input_data, complementarity_method='SOS1')
     model.run()
-    rival_existing_decision, inv_existing_decision=model.display_results()
+    rival_existing_decision, inv_existing_decision, flow_result,  inv_new_prod_conv,  inv_new_prod_wind,  inv_new_prod_PV=model.display_results()
 
 
+    
 
 
