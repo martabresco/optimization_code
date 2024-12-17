@@ -5,7 +5,7 @@ import math as m
 import numpy as np
 
 
-from data_gpt import (
+from data_simple_model import (
     investor_generation_data,
     wind_PF,
     pv_PF,
