@@ -7,7 +7,7 @@ from scipy.stats import norm
 import numpy as np
 
 
-from data_gpt import (
+from data_simple_model import (
     investor_generation_data,
     rival_generation_data,
     lines_data,
@@ -17,7 +17,6 @@ from data_gpt import (
     demand_distribution,
     demand_prices,
     investment_data,
-    #DA_prices,
     Df_demand,
     Df_rival,
     Omega_n_sets,
