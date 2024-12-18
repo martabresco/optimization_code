@@ -6,7 +6,7 @@ import seaborn as sb
 import timeit
 
 
-from data_gpt import (
+from data_benders import (
     investor_generation_data_d,
     pv_PF,
     investment_data,
