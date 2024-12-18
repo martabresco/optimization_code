@@ -2,14 +2,14 @@ import pandas as pd
 import numpy as np
 from scipy.stats import norm
 
-# Functions to download 
+# Functions to download nessesary files
 
 def load_generation_data(filepath, sheet_name):
     return pd.read_excel(filepath, sheet_name=sheet_name)
 
 def load_power_factors(filepath_wind, filepath_pv):
-    wind_PF = pd.read_excel(filepath_wind)  # Faktorer for vind
-    pv_PF = pd.read_excel(filepath_pv)      # Faktorer for sol
+    wind_PF = pd.read_excel(filepath_wind)  
+    pv_PF = pd.read_excel(filepath_pv)      
     return wind_PF, pv_PF
 
 def load_investment_data(filepath):
@@ -51,7 +51,7 @@ def DA_prices_creation():
 
     return hourly_prices
 
-# Laste nødvendige data
+# Load nessesary data
 investor_generation_data = load_generation_data("Generation Data.xlsx", "Generation_investor")
 investor_generation_data_d = load_generation_data("Generation Data.xlsx", "Generation_investor_decom")
 wind_PF, pv_PF = load_power_factors("Wind_PowerFactor_AverageDay.xlsx", "PV_PowerFactor_AverageDay.xlsx")
