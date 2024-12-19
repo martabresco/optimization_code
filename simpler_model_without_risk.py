@@ -25,11 +25,11 @@ from data_simple_model import (
     DA_prices
 )
 
-  
-discount_rate = 0.07 #Source:  ProjectedCosts ofGeneratingElectricity, IEA 2020
+pd.set_option('display.float_format', '{:.2e}'.format) 
+discount_rate = 0.05 #Source:  ProjectedCosts ofGeneratingElectricity, IEA 2020
 lifetime_years = 20
 nodes = list(range(0, 24))
-K = 1.6e10  #in dollars, max investment budget
+K = 6e9  #in dollars, max investment budget
 cand_Conv_cost=55
 
 Demand = np.zeros((24, 24))  # 24x24 numpy array
@@ -289,7 +289,7 @@ class Optimal_Investment:
     
         # Constraint allowing investment in only one node across the entire system
         self.constraints.upper_level_only_invest_one_node = self.model.addConstr(
-            gp.quicksum(self.variables.node_bin[n] for n in range(0, 24)) <= 14,
+            gp.quicksum(self.variables.node_bin[n] for n in range(0, 24)) <= 1,
             name="Only one node can have investments in the system"
         )
     
@@ -482,8 +482,6 @@ class Optimal_Investment:
 
 
 
-
-
     def _build_objective_function(self):
         # Assuming 'probability_scenario' is a list of probabilities for each scenario
         probability_scenario=1/20 #probability of each lambda scenario
@@ -502,10 +500,8 @@ class Optimal_Investment:
                 gp.quicksum(
                     gp.quicksum(
                         probability_scenario *
-                        DA_prices[w, n, h] * (
-                            self.variables.prod_new_conv_unit[(w, h, n)] +
-                            (
-                                self.variables.prod_existing_conv[(w, h, n)]
+                        DA_prices[w, n, h] * (self.variables.prod_new_conv_unit[(w, h, n)] +
+                            (self.variables.prod_existing_conv[(w, h, n)]
                                 if n+1 in self.data.investor_generation_data["Node"].values
                                 else 0  # Skip if there is no existing generator at node n
                             ) +
@@ -523,11 +519,11 @@ class Optimal_Investment:
                                 else 0  # Skip cost if there is no existing generator at node n
                             )
                         )
-                        for w in range(0, self.data.nb_scenarios)  # Iterate over all scenarios
+                         for n in range(0, 24)# Iterate over all scenarios
                     )
                     for h in range(0, 24)  # Iterate over 24 hours
                 )
-                for n in range(0, 24)  # Iterate over all nodes
+                for w in range(0, self.data.nb_scenarios)# Iterate over all nodes
             )
             * (1 / ((1 + discount_rate) ** t))  # Discount factor for year t
             for t in range(1, lifetime_years + 1)  # Iterate over the lifetime in years
@@ -575,8 +571,9 @@ class Optimal_Investment:
         #         )
     
         # Set the objective as the minimization of total cost
-        obj=investment_cost - production_revenue
-        self.model.setObjective(-obj, GRB.MAXIMIZE)
+        obj=production_revenue-investment_cost
+        self.model.setObjective(obj, GRB.MAXIMIZE)
+
         
     def run(self):
        self.model.optimize()
@@ -607,6 +604,7 @@ class Optimal_Investment:
         # Objective value
         print(f"Optimal Objective Value (Total Cost): {self.results.objective_value:.2f}")
         
+        
         # Investment Decisions
         print("\nInvestment Decisions:")
         for n in range(0, 24):  # Assuming 24 nodes
@@ -620,6 +618,9 @@ class Optimal_Investment:
                 print(f"  - Wind Capacity: {self.variables.cap_invest_wind[n].x:.2f} MW")
             if self.variables.node_bin[n].x > 0:
                 print(f"  - Investment Active in Node")
+                
+                
+        
                 
                 
         #Rival
@@ -660,8 +661,109 @@ class Optimal_Investment:
          
         print("xxxxxxxxxxx",self.data.investment_data.loc[self.data.investment_data["Technology"] == "Conventional", "Inv_Cost"].values[0])
 
+
+        
+        
+        probability_scenario=1/20
+        production_revenue = gp.quicksum(
+            365 * gp.quicksum(
+                gp.quicksum(
+                    gp.quicksum(
+                        probability_scenario *
+                        DA_prices[w, n, h] * (self.variables.prod_new_conv_unit[(w, h, n)].x +
+                            (self.variables.prod_existing_conv[(w, h, n)].x
+                                if n+1 in self.data.investor_generation_data["Node"].values
+                                else 0  # Skip if there is no existing generator at node n
+                            ) +
+                            self.variables.prod_PV[(w, h, n)].x +
+                            self.variables.prod_wind[(w, h, n)].x
+                        )
+                        - (
+                            self.variables.prod_new_conv_unit[(w, h, n)].x * cand_Conv_cost  # Investment cost
+                            + (
+                                self.variables.prod_existing_conv[(w, h, n)].x *
+                                self.data.investor_generation_data.loc[
+                                    self.data.investor_generation_data["Node"] == n+1, "Bid price"
+                                ].values[0]
+                                if n+1 in self.data.investor_generation_data["Node"].values
+                                else 0  # Skip cost if there is no existing generator at node n
+                            )
+                        )
+                        for n in range(0, 24)# Iterate over all scenarios
+                   )
+                   for h in range(0, 24)  # Iterate over 24 hours
+               )
+               for w in range(0, self.data.nb_scenarios)# Iterate over all nodes
+            )
+            * (1 / ((1 + discount_rate) ** t))  # Discount factor for year t
+            for t in range(1, lifetime_years + 1)  # Iterate over the lifetime in years
+        )
+       # print(f"revenue:, {production_revenue:.2e}")
+        
+        
+        probability_scenario=1/20
+        profit = gp.quicksum(
+            365 * gp.quicksum(
+                gp.quicksum(
+                    gp.quicksum(
+                        probability_scenario *
+                        DA_prices[w, n, h] * (self.variables.prod_new_conv_unit[(w, h, n)].x +
+                            (self.variables.prod_existing_conv[(w, h, n)].x
+                                if n+1 in self.data.investor_generation_data["Node"].values
+                                else 0  # Skip if there is no existing generator at node n
+                            ) +
+                            self.variables.prod_PV[(w, h, n)].x +
+                            self.variables.prod_wind[(w, h, n)].x
+                        )
+                        for n in range(0, 24)# Iterate over all scenarios
+                   )
+                   for h in range(0, 24)  # Iterate over 24 hours
+               )
+               for w in range(0, self.data.nb_scenarios)# Iterate over all nodes
+            )
+            * (1 / ((1 + discount_rate) ** t))  # Discount factor for year t
+            for t in range(1, lifetime_years + 1)  # Iterate over the lifetime in years
+        )
+        #print(f"profit:, {profit:.2e}")
+
+
+
+        production_cost = gp.quicksum(
+            365 * gp.quicksum(
+                gp.quicksum(
+                    gp.quicksum(
+                        
+                            self.variables.prod_new_conv_unit[(w, h, n)].x * cand_Conv_cost  # Investment cost
+                            + (
+                                self.variables.prod_existing_conv[(w, h, n)].x *
+                                self.data.investor_generation_data.loc[
+                                    self.data.investor_generation_data["Node"] == n+1, "Bid price"
+                                ].values[0]
+                                if n+1 in self.data.investor_generation_data["Node"].values
+                                else 0  # Skip cost if there is no existing generator at node n
+                        )
+                        for n in range(0, 24)# Iterate over all scenarios
+                   )
+                   for h in range(0, 24)  # Iterate over 24 hours
+               )
+               for w in range(0, self.data.nb_scenarios)# Iterate over all nodes
+            )
+            * (1 / ((1 + discount_rate) ** t))  # Discount factor for year t
+            for t in range(1, lifetime_years + 1)  # Iterate over the lifetime in years
+        )
+        #print(f"production_cost:, {production_cost:.2e}")
+
+        obj=production_revenue-production_cost
+        profit_value = obj.getValue()
+        print(f"profit: {profit_value:.2e}")
+
+
+
+
                     
         return rival_existing_decision, inv_existing_decision,flow_result,  inv_new_prod_conv,  inv_new_prod_wind,  inv_new_prod_PV, voltage_angle
+        
+        
         
         
         
@@ -711,6 +813,140 @@ class Optimal_Investment:
 
 
     
+def vary_K_and_store_results(model_instance, K_values):
+    """
+    Function to vary the parameter K, solve the optimization problem,
+    and store results. Stores the value of K, the objective function value,
+    the invested node, and the respective capacities (PV, Wind, Conventional).
+    """
+    results = []
+
+    for K in K_values:
+        print(f"Running optimization for K = {K}...")
+        
+        # Update the budget constraint
+        model_instance.constraints.upper_level_max_investment_budget.RHS = K
+        
+        # Re-optimize the model
+        model_instance.model.optimize()
+        
+        # Extract results
+        if model_instance.model.status == GRB.OPTIMAL:
+            objective_value = model_instance.model.ObjVal
+        else:
+            print(f"Model did not converge for K = {K}")
+            objective_value = None
+
+        # Check for investments
+        invested_nodes = [
+            n for n in model_instance.variables.node_bin
+            if model_instance.variables.node_bin[n].x > 0.5
+        ]
+        
+        invested_node = invested_nodes[0] if invested_nodes else None
+
+        # Extract investments by type
+        pv_capacity = (
+            model_instance.variables.cap_invest_PV[invested_node].x
+            if invested_node and model_instance.variables.cap_invest_PV[invested_node].x > 0 else 0
+        )
+        wind_capacity = (
+            model_instance.variables.cap_invest_wind[invested_node].x
+            if invested_node and model_instance.variables.cap_invest_wind[invested_node].x > 0 else 0
+        )
+        conventional_capacity = (
+            model_instance.variables.cap_invest_conv[invested_node].x
+            if invested_node and model_instance.variables.cap_invest_conv[invested_node].x > 0 else 0
+        )
+
+        # Store results
+        results.append({
+            "K_value": K,
+            "objective_value": objective_value,
+            "invested_node": invested_node,
+            "pv_capacity": pv_capacity,
+            "wind_capacity": wind_capacity,
+            "conventional_capacity": conventional_capacity,
+        })
+    
+    # Convert results to a pandas DataFrame
+    results_df = pd.DataFrame(results)
+    
+    return results_df
+
+
+
+
+
+def vary_Nodes_and_store_results(model_instance, N_values):
+    """
+    Function to vary the parameter K, solve the optimization problem,
+    and store results. Stores the value of K, the objective function value,
+    the invested node, and the respective capacities (PV, Wind, Conventional).
+    """
+    results = []
+    summary = []
+
+    for N in N_values:
+        print(f"Running optimization for N = {N}...")
+        
+        # Update the budget constraint
+        model_instance.constraints.upper_level_only_invest_one_node.RHS = N
+        
+        # Re-optimize the model
+        model_instance.model.optimize()
+        
+        # Extract results
+        if model_instance.model.status == GRB.OPTIMAL:
+            objective_value = model_instance.model.ObjVal
+        else:
+            print(f"Model did not converge for N = {N}")
+            objective_value = None
+
+        # Check for investments
+        invested_nodes = [
+            n for n in model_instance.variables.node_bin
+            if model_instance.variables.node_bin[n].x > 0.5
+        ]
+        
+        total_pv_capacity = 0
+        total_wind_capacity = 0
+        total_conventional_capacity = 0
+
+        list_nodes_invested=[]
+        for invested_node in invested_nodes:
+            total_pv_capacity += (
+                model_instance.variables.cap_invest_PV[invested_node].x
+                if model_instance.variables.cap_invest_PV[invested_node].x > 0 else 0
+            )
+            total_wind_capacity += (
+                model_instance.variables.cap_invest_wind[invested_node].x
+                if model_instance.variables.cap_invest_wind[invested_node].x > 0 else 0
+            )
+            total_conventional_capacity += (
+                model_instance.variables.cap_invest_conv[invested_node].x
+                if model_instance.variables.cap_invest_conv[invested_node].x > 0 else 0
+            )
+            list_nodes_invested.append(invested_node + 1)
+
+        # Store detailed results
+        results.append({
+            "N_value": N,
+            "num_invested_nodes": list_nodes_invested,
+            "total_pv_production": total_pv_capacity,
+            "total_wind_production": total_wind_capacity,
+            "total_conventional_production": total_conventional_capacity,
+        })
+        
+        
+
+    # Convert to DataFrames
+    results_df = pd.DataFrame(results)
+
+    
+    return results_df
+
+
 
 
 
@@ -741,6 +977,35 @@ if __name__ == "__main__":
     rival_existing_decision, inv_existing_decision, flow_result,  inv_new_prod_conv,  inv_new_prod_wind,  inv_new_prod_PV, voltage_angle=model.display_results()
 
 
+
+#     # Define the range of K values to analyze
+    # K_values = [1e5,1.5e5, 1e6,1.5e6, 1e7,1.5e7,1e8, 2e8,3e8,4e8,5e8,6e8,7e8,8e8,9e8,1e9,1.2e9,1.4e9,1.6e9,1.8e9,2e9,3e9,4e9,5e9,6e9]  # Example K values in dollars
+
+    # # Vary K and store results
+    # results_df = vary_K_and_store_results(model, K_values)
+
+    # # Display the results
+    # print("Results of varying K:")
+    # print(results_df)
+
+    # # Optionally, save the results to a CSV file
+    # results_df.to_excel("K_results.xlsx", index=False)
+
+ # Define the range of N values to analyze
+    N_values =range(0,24)
+
+    # Vary N and store results
+    results_df2 = vary_Nodes_and_store_results(model, N_values)
+
+    # Display the results
+    print("Results of varying N:")
+    print(results_df2)
+
+    # Optionally, save the results to a CSV file
+    results_df2.to_excel("N_results.xlsx", index=False)
+
+
+    
     
 
 

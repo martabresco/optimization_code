@@ -77,11 +77,12 @@ def load_investment_data(filepath):
     #return pd.read_excel(filepath, usecols=[1])  # Utiliser uniquement la 2e colonne
 
 
-# Création de la matrice de susceptance
+# Création de la matrice de susceptance - created with susceptance = 500, corresping to 0.002 pu
+#values from IEEE24 bus system are in pu and no v_base is available
 def create_susceptance_matrix(data, num_nodes):
     matrix = np.zeros((num_nodes, num_nodes))
     for _, _, from_node, to_node, x, _ in data:
-        value = 1 / x if x != 0 else 0
+        value = 500 if x != 0 else 0
         matrix[from_node - 1, to_node - 1] = value
         matrix[to_node - 1, from_node - 1] = value
     return pd.DataFrame(matrix, index=range(1, num_nodes + 1), columns=range(1, num_nodes + 1))
