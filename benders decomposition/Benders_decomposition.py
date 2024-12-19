@@ -33,7 +33,7 @@ BENDERS_TYPES = ['unit-cut','multi-cut'] # types of benders algorithm
 # Set values of input parameters
 invested_node=18
 max_Investment_cap=250
-Budget= 1.6e7
+Budget= 9e6
 discount_rate=0.05
 lifetime_years=20
 
@@ -506,7 +506,7 @@ import pandas as pd
 import timeit
 
 # Define the range of budget values
-K_values = [1.50e5, 1.00e6, 1.50e6, 1.00e7, 1.50e7, 1.00e8, 2.00e8, 3.00e8, 4.00e8, 5.00e8, 6.00e8, 7.00e8]
+K_values = [ 1.50e6, 1.00e7, 1.50e7, 1.00e8, 2.00e8, 3.00e8, 4.00e8, 5.00e8, 6.00e8, 7.00e8, 8e8]
 
 # Results storage
 results = []
