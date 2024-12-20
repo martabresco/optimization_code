@@ -165,8 +165,8 @@ class benders_subproblem: # Class representing the subproblems for each scenario
         
         self.constraints.PV_upper_limit_constraint = m.addConstrs(
             (
-                self.variables.PV_production[n,t]<= self.variables.inv_cap_PV
-                #self.variables.PV_production[n,t]<= self.variables.inv_cap_PV*PF_PV[t]
+                #self.variables.PV_production[n,t]<= self.variables.inv_cap_PV
+                self.variables.PV_production[n,t]<= self.variables.inv_cap_PV*PF_PV[t]
                 for n in range(24)
                 for t in range(24)
             ),
