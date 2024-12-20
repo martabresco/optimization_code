@@ -44,15 +44,15 @@ pE = model.addVars(
 )
 
 # Objective
-objective = gb.quicksum(
+objective = investment_data.iloc[1,1]*xP-( gb.quicksum(
     (1 / (1 + discount_rate) ** t) * (
-        -365 * gb.quicksum(
+        365 * gb.quicksum(
             gb.quicksum(
                 DA_prices[scenario, h, n] * (pP[n, h] + pE[n, h])
                 for n in range(24)
             )
             for h in range(24)
-        ) +
+        ) -
         365 * gb.quicksum(
             gb.quicksum(
                 pE[n, h] * generation_existing_cost[n]
@@ -63,7 +63,7 @@ objective = gb.quicksum(
     )
     for t in range(1, lifetime_years + 1)
     for scenario in SCENARIOS
-)
+))
 model.setObjective(objective, gb.GRB.MINIMIZE)
 
 # Constraints
@@ -134,15 +134,15 @@ else:
 #         )
 
 #         # Objective
-#         objective = gb.quicksum(
+#         objective = investment_data.iloc[1,1]*xP-gb.quicksum(
 #             (1 / (1 + discount_rate) ** t) * (
-#                 -365 * gb.quicksum(
+#                 365 * gb.quicksum(
 #                     gb.quicksum(
 #                         DA_prices[scenario, h, n] * (pP[n, h] + pE[n, h])
 #                         for n in range(24)
 #                     )
 #                     for h in range(24)
-#                 ) +
+#                 ) -
 #                 365 * gb.quicksum(
 #                     gb.quicksum(
 #                         pE[n, h] * generation_existing_cost[n]
