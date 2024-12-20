@@ -187,7 +187,7 @@ matrix_df
 for _, _, from_node, to_node, x, _ in data:
     from_idx = from_node - 1  # Adjusting for 0-based indexing
     to_idx = to_node - 1
-    value = 1 / x if x != 0 else 0  # Avoid division by zero
+    value = 500 if x != 0 else 0  # Avoid division by zero
     matrix[from_idx, to_idx] = value
     matrix[to_idx, from_idx] = value  # Ensure symmetry
 
