@@ -688,8 +688,8 @@ class Optimal_Investment:
         obj=production_revenue-production_cost
         profit_value = obj.getValue()
         print(f"profit: {profit_value:.2e}")
-        print(f"Revenue: {production_revenue:.2e}")
-        print(f"Costs: {production_cost:.2e}")
+        #print(f"Revenue: {production_revenue:.2e}")
+        #print(f"Costs: {production_cost:.2e}")
 
 
 
@@ -820,6 +820,7 @@ def vary_Nodes_and_store_results(model_instance, N_values):
         # Store detailed results
         results.append({
             "N_value": N,
+            "objective_value": objective_value,
             "num_invested_nodes": list_nodes_invested,
             "total_pv_production": total_pv_capacity,
             "total_wind_production": total_wind_capacity,
@@ -880,17 +881,17 @@ if __name__ == "__main__":
     # results_df.to_excel("K_results.xlsx", index=False)
 
  # Define the range of N values to analyze
-    # N_values =range(0,24)
+    N_values =range(0,24)
 
-    # Vary N and store results
-    # results_df2 = vary_Nodes_and_store_results(model, N_values)
+   # Vary N and store results
+    results_df2 = vary_Nodes_and_store_results(model, N_values)
 
-    # # Display the results
-    # print("Results of varying N:")
-    # print(results_df2)
+    # Display the results
+    print("Results of varying N:")
+    print(results_df2)
 
     # Optionally, save the results to a CSV file
-    # results_df2.to_excel("N_results.xlsx", index=False)
+    results_df2.to_excel("N_results.xlsx", index=False)
 
 
     
