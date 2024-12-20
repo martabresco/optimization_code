@@ -111,24 +111,7 @@ class benders_subproblem: # Class representing the subproblems for each scenario
         #index shortcut 
         m = self.model
 
-                                                            
-        # subproblem_objective = -20 * 365 *(
-        #     gb.quicksum(
-        #         gb.quicksum(
-        #             DA_prices[self.data.scenario, t, n]*
-        #             (self.variables.PV_production[n, t] + self.variables.existing_production[n, t])
-        #             for n in range(24)
-        #         )
-        #         for t in range(24)
-        #     ))+20*365* (
-        #     gb.quicksum(
-        #         gb.quicksum(
-        #             self.variables.existing_production[n, t] * generation_existing_cost[n]
-        #             for n in range(24)  # Loop over all nodes
-        #         )
-        #         for t in range(24)  # Loop over all hours
-        #     )                
-        # )
+
 
         subproblem_objective = (
             gb.quicksum(  # Sum over the lifetime of the project
@@ -447,33 +430,33 @@ class benders_master: # class of master problem
 
 ################ solve and print results for uni-cut ##################################
 
-# start = timeit.timeit() # define start time
+start = timeit.timeit() # define start time
 
-# DA_model = benders_master(benders_type='uni-cut',epsilon=0.1,max_iters=100)
-# DA_model._benders_iterate()
+DA_model = benders_master(benders_type='uni-cut',epsilon=0.1,max_iters=100)
+DA_model._benders_iterate()
 
-# end = timeit.timeit() # define end time
+end = timeit.timeit() # define end time
 
-# print('uni-cut solving time',end-start) # print solving time
-
-
-# print('Iterations', DA_model.data.iteration)
-
-# print('upper bounds', DA_model.data.upper_bounds)
-# print('lower bounds', DA_model.data.lower_bounds)
-
-# print('uni-cut optimal profit',abs(DA_model.data.upper_bounds[DA_model.data.iteration]), '$') # print optimal cost (last upper-bound)
-
-# print('uni-cut investment x',DA_model.variables.inv_cap_PV.x, 'MW') # print optimal cost (last upper-bound)
+print('uni-cut solving time',end-start) # print solving time
 
 
+print('Iterations', DA_model.data.iteration)
 
-# f, ax=plt.subplots(figsize=(10,10)) # print upper and lower bounds evolution at each iteration
-# ax.plot(range(1,DA_model.data.iteration+1),[DA_model.data.upper_bounds[it] for it in range(1,DA_model.data.iteration+1)],label='upper-bound',linewidth=2,marker='o',color='red') # upper bounds at each iteration
-# ax.plot(range(1,DA_model.data.iteration+1),[DA_model.data.lower_bounds[it] for it in range(1,DA_model.data.iteration+1)],label='lower-bound',linewidth=2,marker='o',color='blue') # lower bounds at each iteration
-# ax.set_ylabel('Bounds (DKK)',fontsize=size_pp+5) 
-# ax.set_xlabel('Iterations',fontsize=size_pp+5) 
-# ax.legend(bbox_to_anchor=(0.75,1),bbox_transform=plt.gcf().transFigure,ncol=2,fontsize=size_pp+5)
+print('upper bounds', DA_model.data.upper_bounds)
+print('lower bounds', DA_model.data.lower_bounds)
+
+print('uni-cut optimal profit',abs(DA_model.data.upper_bounds[DA_model.data.iteration]), '$') # print optimal cost (last upper-bound)
+
+print('uni-cut investment x',DA_model.variables.inv_cap_PV.x, 'MW') # print optimal cost (last upper-bound)
+
+
+
+f, ax=plt.subplots(figsize=(10,10)) # print upper and lower bounds evolution at each iteration
+ax.plot(range(1,DA_model.data.iteration+1),[DA_model.data.upper_bounds[it] for it in range(1,DA_model.data.iteration+1)],label='upper-bound',linewidth=2,marker='o',color='red') # upper bounds at each iteration
+ax.plot(range(1,DA_model.data.iteration+1),[DA_model.data.lower_bounds[it] for it in range(1,DA_model.data.iteration+1)],label='lower-bound',linewidth=2,marker='o',color='blue') # lower bounds at each iteration
+ax.set_ylabel('Bounds (DKK)',fontsize=size_pp+5) 
+ax.set_xlabel('Iterations',fontsize=size_pp+5) 
+ax.legend(bbox_to_anchor=(0.75,1),bbox_transform=plt.gcf().transFigure,ncol=2,fontsize=size_pp+5)
 
 
 ################# solve and print results for multi-cut  #################################
@@ -502,77 +485,78 @@ class benders_master: # class of master problem
 
 ###################   to vary K    ########################################
 
-import pandas as pd
-import timeit
+# import pandas as pd
 
-# Define the range of budget values
-K_values = [ 1.50e6, 1.00e7, 1.50e7, 1.00e8, 2.00e8, 3.00e8, 4.00e8, 5.00e8, 6.00e8, 7.00e8, 8e8]
 
-# Results storage
-results = []
+# # Define the range of budget values
+# K_values = [ 1.50e6, 1.00e7, 1.50e7, 1.00e8, 2.00e8, 3.00e8, 4.00e8, 5.00e8, 6.00e8, 7.00e8, 8e8]
 
-for budget in K_values:
-    # Update the budget
-    Budget = budget
-    print(f"Running optimization for Budget: {Budget} DKK")
+# # Results storage
+# results = []
 
-    try:
-        # Solve the problem for uni-cut
-        start = timeit.default_timer()
-        DA_model_uni = benders_master(benders_type='uni-cut', epsilon=0.1, max_iters=100)
-        DA_model_uni.data.budget = Budget  # Dynamically set the budget
-        DA_model_uni._benders_iterate()
-        end = timeit.default_timer()
+# for budget in K_values:
+#     # Update the budget
+#     Budget = budget
+#     print(f"Running optimization for Budget: {Budget} DKK")
 
-        uni_cut_cost = DA_model_uni.data.upper_bounds.get(DA_model_uni.data.iteration, float('inf'))
-        uni_cut_investment = DA_model_uni.variables.inv_cap_PV.x if DA_model_uni.variables.inv_cap_PV else None
-        uni_cut_iterations = DA_model_uni.data.iteration
+#     try:
+#         # Solve the problem for uni-cut
+#         start = timeit.default_timer()
+#         DA_model_uni = benders_master(benders_type='uni-cut', epsilon=0.1, max_iters=100)
+#         DA_model_uni.data.budget = Budget  # Dynamically set the budget
+#         DA_model_uni._benders_iterate()
+#         end = timeit.default_timer()
 
-        # Store uni-cut results
-        results.append({
-            "Budget": Budget,
-            "Benders Type": "uni-cut",
-            "Optimal Cost": uni_cut_cost,
-            "Investment Capacity (MW)": uni_cut_investment,
-            "Iterations": uni_cut_iterations,
-            "Solving Time (s)": end - start
-        })
+#         uni_cut_cost = DA_model_uni.data.upper_bounds.get(DA_model_uni.data.iteration, float('inf'))
+#         uni_cut_investment = DA_model_uni.variables.inv_cap_PV.x if DA_model_uni.variables.inv_cap_PV else None
+#         uni_cut_iterations = DA_model_uni.data.iteration
 
-        # Solve the problem for multi-cut
-        start = timeit.default_timer()
-        DA_model_multi = benders_master(benders_type='multi-cut', epsilon=0.1, max_iters=100)
-        DA_model_multi.data.budget = Budget  # Dynamically set the budget
-        DA_model_multi._benders_iterate()
-        end = timeit.default_timer()
+#         # Store uni-cut results
+#         results.append({
+#             "Budget": Budget,
+#             "Benders Type": "uni-cut",
+#             "Optimal Cost": uni_cut_cost,
+#             "Investment Capacity (MW)": uni_cut_investment,
+#             "Iterations": uni_cut_iterations,
+#             "Solving Time (s)": end - start
+#         })
 
-        multi_cut_cost = DA_model_multi.data.upper_bounds.get(DA_model_multi.data.iteration, float('inf'))
-        multi_cut_investment = DA_model_multi.variables.inv_cap_PV.x if DA_model_multi.variables.inv_cap_PV else None
-        multi_cut_iterations = DA_model_multi.data.iteration
+#         # Solve the problem for multi-cut
+#         start = timeit.default_timer()
+#         DA_model_multi = benders_master(benders_type='multi-cut', epsilon=0.1, max_iters=100)
+#         DA_model_multi.data.budget = Budget  # Dynamically set the budget
+#         DA_model_multi._benders_iterate()
+#         end = timeit.default_timer()
 
-        # Store multi-cut results
-        results.append({
-            "Budget": Budget,
-            "Benders Type": "multi-cut",
-            "Optimal Cost": multi_cut_cost,
-            "Investment Capacity (MW)": multi_cut_investment,
-            "Iterations": multi_cut_iterations,
-            "Solving Time (s)": end - start
-        })
+#         multi_cut_cost = DA_model_multi.data.upper_bounds.get(DA_model_multi.data.iteration, float('inf'))
+#         multi_cut_investment = DA_model_multi.variables.inv_cap_PV.x if DA_model_multi.variables.inv_cap_PV else None
+#         multi_cut_iterations = DA_model_multi.data.iteration
 
-    except Exception as e:
-        print(f"Optimization failed for Budget: {Budget} with error: {e}")
-        results.append({
-            "Budget": Budget,
-            "Benders Type": "Error",
-            "Optimal Cost": None,
-            "Investment Capacity (MW)": None,
-            "Iterations": None,
-            "Solving Time (s)": None,
-            "Error": str(e)
-        })
+#         # Store multi-cut results
+#         results.append({
+#             "Budget": Budget,
+#             "Benders Type": "multi-cut",
+#             "Optimal Cost": multi_cut_cost,
+#             "Investment Capacity (MW)": multi_cut_investment,
+#             "Iterations": multi_cut_iterations,
+#             "Solving Time (s)": end - start
+#         })
 
-# Convert results to DataFrame
-results_df = pd.DataFrame(results)
+#     except Exception as e:
+#         print(f"Optimization failed for Budget: {Budget} with error: {e}")
+#         results.append({
+#             "Budget": Budget,
+#             "Benders Type": "Error",
+#             "Optimal Cost": None,
+#             "Investment Capacity (MW)": None,
+#             "Iterations": None,
+#             "Solving Time (s)": None,
+#             "Error": str(e)
+#         })
 
-# Save the DataFrame to an Excel file
-results_df.to_excel("k_results_decomposition.xlsx", index=False)
+# # Convert results to DataFrame
+# results_df = pd.DataFrame(results)
+
+# # Save the DataFrame to an Excel file
+# results_df.to_excel("k_results_decomposition.xlsx", index=False)
+
