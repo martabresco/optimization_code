@@ -3,6 +3,7 @@ from gurobipy import GRB
 import pandas as pd
 import math as m
 import numpy as np
+import matplotlib.pyplot as plt
 
 
 from data_simple_model import (
@@ -16,6 +17,8 @@ from data_simple_model import (
 nodes = list(range(1, 25))
 
 cand_Conv_cost=55;
+discount_rate = 0.05; #Source:  ProjectedCosts ofGeneratingElectricity, IEA 2020
+lifetime_years=20
 
 class Expando(object):
     '''
@@ -43,7 +46,7 @@ class Optimal_Investment:
     
 
     
-    def __init__(self, input_data: InputData, complementarity_method: str = 'SOS1',beta:float=0.6, alpha: float=0.95, K: float=1.6e7):
+    def __init__(self, input_data: InputData, complementarity_method: str = 'SOS1',beta:float=0, alpha: float=0.95, K: float=1.6e7):
         self.data = input_data  # Reference to the InputData instance
         self.beta=beta
         self.alpha=alpha
@@ -224,6 +227,7 @@ class Optimal_Investment:
         }
     
         # Maximum capacity investment for wind units at each node
+        
         self.constraints.upper_level_max_inv_wind = {
             n: self.model.addConstr(
                 self.variables.cap_invest_wind[n] <= self.variables.wind_invest_bin[n] * self.data.investment_data.iloc[2, 2],
@@ -302,7 +306,7 @@ class Optimal_Investment:
         self.constraints.eta_zeta_profit = {
             k: self.model.addConstr(
                 self.variables.eta[k] >= self.variables.zeta - (
-                    20 * 365 * gp.quicksum(
+                    gp.quicksum( 1/((1+discount_rate)**t)*365 * gp.quicksum(
                         self.data.DA_prices[k, n - 1, h - 1] * (  # Adjust h for 0-indexed DA_prices
                             self.variables.prod_new_conv_unit[(k, h, n)] +
                             (
@@ -326,7 +330,7 @@ class Optimal_Investment:
                         )
                         for h in range(1, 25)  # Outer loop for hours
                         for n in range(1, 25)  # Inner loop for nodes
-                    ) -investment_cost
+                    )for t in range(1, lifetime_years+1)) -investment_cost
                 )  ,
                 name=f"eta_ge_zeta_minus_profit_scenario_{k}"
             )
@@ -348,9 +352,9 @@ class Optimal_Investment:
             for n in range(1, 25)
         )
 
-
-        production_revenue = 20*365*gp.quicksum(
-            probability_scenario*(
+        #print("here", self.variables.prod_new_conv_unit.keys() ) # Iterate over all keys)
+        production_revenue = gp.quicksum(gp.quicksum(probability_scenario*gp.quicksum(
+            gp.quicksum(
             self.data.DA_prices[w,n-1,h-1] *(  # Adjust h for 0-indexed DA_prices
                 self.variables.prod_new_conv_unit[(w, h, n)] +
                 (
@@ -370,9 +374,12 @@ class Optimal_Investment:
                     if n in self.data.investor_generation_data["Node"].values
                     else 0  # Skip cost if there is no existing generator at node n
                 )
-            ))
-            for (w, h, n) in self.variables.prod_new_conv_unit.keys() ) # Iterate over all keys
-        
+            )
+            for n in range(1, 25) ) # Iterate over all nodes))
+            for h in range(1,25))
+            
+            for w in range(0,self.data.nb_scenarios))*(1/((1 + discount_rate) ** t))*365
+            for t in range (1,lifetime_years + 1))
 
          # Add risk measure to the objective
         risk_term = self.variables.zeta - (1 / (1 - self.alpha)) * gp.quicksum(
@@ -649,6 +656,46 @@ def vary_K_and_store_results(model_instance, K_values):
     
     return results_df
 
+
+def plot_profit_distribution_from_results(results):
+    """
+    Plots the distribution of profits (objective values) from the results of `vary_beta_and_store_results`.
+
+    Parameters:
+    - results: List of dictionaries containing results for each beta value,
+               including "objective_value" and other information.
+    """
+    # Extract objective values from the results
+    profits = [res["objective_value"] for res in results if res["objective_value"] is not None]
+    
+    # Check if profits are available
+    if not profits:
+        print("No valid objective values found in the results.")
+        return
+    
+    # Normalize probabilities (assuming equal probability for each scenario)
+    probabilities = [1 / len(profits)] * len(profits)
+    
+    # Plot the distribution
+    plt.hist(
+        profits, bins=30, weights=probabilities, density=True, alpha=0.75, edgecolor="black"
+    )
+    
+    # Set labels and title
+    plt.xlabel("Profit (Objective Value)")
+    plt.ylabel("Density (Probability)")
+    plt.title("Profit Distribution Across Scenarios (Varying Beta)")
+    
+    # Display grid
+    plt.grid(alpha=0.3)
+    
+    # Show the plot
+    plt.show()
+
+    return None
+
+
+
 # ########## No sensitivity analysis###################
 # if __name__ == "__main__":
 #     input_data = prepare_input_data()
@@ -664,10 +711,10 @@ if __name__ == "__main__":
     input_data = prepare_input_data()
 
     # Instantiate the optimization model
-    model_instance = Optimal_Investment(input_data=input_data, complementarity_method='SOS1',K=1e9)
+    model_instance = Optimal_Investment(input_data=input_data, complementarity_method='SOS1',K=2e9)
 
     # Define the range of beta values to analyze
-    beta_values = [0,0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1]  # Adjust the range and step size as needed
+    beta_values = [0,0.1,0.12,0.15,0.18, 0.2, 0.3, 0.4, 0.5, 0.55,0.6, 0.7, 0.8, 0.9, 1]  
     #beta_values = [0, 0.001, 0.003, 0.04, 0.05, 0.06, 0.07, 0.08, 0.09, 0.1,0.2]
     # Function to vary beta and store results
     results_df = vary_beta_and_store_results(model_instance, beta_values)
@@ -675,6 +722,8 @@ if __name__ == "__main__":
     # Display the results
     print("Results of varying beta:")
     print(results_df)
+    
+    plot_profit_distribution_from_results(results_df.to_dict(orient="records"))
 
     # Optionally, save the results to a CSV file
     results_df.to_excel("beta_results.xlsx", index=False)
@@ -690,8 +739,8 @@ if __name__ == "__main__":
 #     model_instance = Optimal_Investment(input_data=input_data, complementarity_method='SOS1')
 
 #     # Define the range of K values to analyze
-#     K_values = [1e5,1.5e5, 1e6,1.5e6, 1e7,1.5e7,1e8, 2e8,3e8,4e8,5e8,6e8,7e8,8e8,9e8,1e9,1.2e9,1.4e9,1.6e9,1.8e9,2e9,3e9,4e9,5e9,6e9]  # Example K values in dollars
-
+#     # K_values = [1e5,1.5e5, 1e6,1.5e6, 1e7,1.5e7,1e8, 2e8,3e8,4e8,5e8,6e8,7e8,8e8,9e8,1e9,1.2e9,1.4e9,1.6e9,1.8e9,2e9,3e9,4e9,5e9,6e9]  # Example K values in dollars
+#     K_values = [1e6,1e7,1e8,3e8,5e8,7e8,9e8,1e9,1.2e9,1.4e9,1.6e9,1.8e9]  # Example K values in dollars
 #     # Vary K and store results
 #     results_df = vary_K_and_store_results(model_instance, K_values)
 
