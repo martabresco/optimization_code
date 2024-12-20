@@ -454,7 +454,7 @@ print('uni-cut investment x',DA_model.variables.inv_cap_PV.x, 'MW') # print opti
 f, ax=plt.subplots(figsize=(10,10)) # print upper and lower bounds evolution at each iteration
 ax.plot(range(1,DA_model.data.iteration+1),[DA_model.data.upper_bounds[it] for it in range(1,DA_model.data.iteration+1)],label='upper-bound',linewidth=2,marker='o',color='red') # upper bounds at each iteration
 ax.plot(range(1,DA_model.data.iteration+1),[DA_model.data.lower_bounds[it] for it in range(1,DA_model.data.iteration+1)],label='lower-bound',linewidth=2,marker='o',color='blue') # lower bounds at each iteration
-ax.set_ylabel('Bounds (DKK)',fontsize=size_pp+5) 
+ax.set_ylabel('Bounds ($)',fontsize=size_pp+5) 
 ax.set_xlabel('Iterations',fontsize=size_pp+5) 
 ax.legend(bbox_to_anchor=(0.75,1),bbox_transform=plt.gcf().transFigure,ncol=2,fontsize=size_pp+5)
 
