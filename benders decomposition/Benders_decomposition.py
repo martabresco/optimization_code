@@ -445,7 +445,7 @@ print('Iterations', DA_model.data.iteration)
 print('upper bounds', DA_model.data.upper_bounds)
 print('lower bounds', DA_model.data.lower_bounds)
 
-print('uni-cut optimal profit',abs(DA_model.data.upper_bounds[DA_model.data.iteration]), '$') # print optimal cost (last upper-bound)
+print('uni-cut optimal profit',abs(DA_model.data.upper_bounds[DA_model.data.iteration])*10**(-6), 'mill.$') # print optimal cost (last upper-bound)
 
 print('uni-cut investment x',DA_model.variables.inv_cap_PV.x, 'MW') # print optimal cost (last upper-bound)
 
@@ -470,7 +470,7 @@ ax.legend(bbox_to_anchor=(0.75,1),bbox_transform=plt.gcf().transFigure,ncol=2,fo
 
 # print('multi-cut solving time',end-start) # print solving time
 
-# print('multi-cut optimal profit',abs(DA_model.data.upper_bounds[DA_model.data.iteration]),'$') # print optimal cost (last upper-bound)
+# print('multi-cut optimal profit',abs(DA_model.data.upper_bounds[DA_model.data.iteration])*10**(-6)'mill.$') # print optimal cost (last upper-bound)
 
 # print('multi-cut investment x',DA_model.variables.inv_cap_PV.x, 'MW') # print optimal cost (last upper-bound)
 
@@ -483,7 +483,7 @@ ax.legend(bbox_to_anchor=(0.75,1),bbox_transform=plt.gcf().transFigure,ncol=2,fo
 # ax.legend(bbox_to_anchor=(0.75,1),bbox_transform=plt.gcf().transFigure,ncol=2,fontsize=size_pp+5)
 
 
-###################   to vary K    ########################################
+###################   Results when varying budget   ########################################
 
 # import pandas as pd
 
