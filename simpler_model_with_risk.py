@@ -12,12 +12,12 @@ from data_simple_model import (
     pv_PF,
     investment_data,
     DA_prices
-)
+) #in this model, no data from the network, demand or rival is needed
 
 nodes = list(range(1, 25))
 
 cand_Conv_cost=55;
-discount_rate = 0.05; #Source:  ProjectedCosts ofGeneratingElectricity, IEA 2020
+discount_rate = 0.05; #Source:  Projected Costs of GeneratingElectricity, IEA 2020
 lifetime_years=20
 
 class Expando(object):
@@ -341,8 +341,7 @@ class Optimal_Investment:
 
 
     def _build_objective_function(self):
-        # Assuming 'probability_scenario' is a list of probabilities for each scenario
-        #probability_scenario=[0.06,0.06,0.06,0.02,0.06,0.06,0.06,0.02,0.09,0.09,0.09,0.03,0.09,0.09,0.09,0.03] # Adjust based on actual probabilities if available
+        # Assuming 'probability_scenario' to be the probability of each DA price scenario. It has been assumed to be equiprobable
         probability_scenario=1/20
     
         investment_cost = gp.quicksum(
@@ -352,7 +351,6 @@ class Optimal_Investment:
             for n in range(1, 25)
         )
 
-        #print("here", self.variables.prod_new_conv_unit.keys() ) # Iterate over all keys)
         production_revenue = gp.quicksum(gp.quicksum(probability_scenario*gp.quicksum(
             gp.quicksum(
             self.data.DA_prices[w,n-1,h-1] *(  # Adjust h for 0-indexed DA_prices
@@ -366,7 +364,7 @@ class Optimal_Investment:
                 self.variables.prod_wind[(w, h, n)]
             )
             - (
-                self.variables.prod_new_conv_unit[(w, h, n)] * cand_Conv_cost  # Subtracting investment cost for new conventional units
+                self.variables.prod_new_conv_unit[(w, h, n)] * cand_Conv_cost  # Subtracting investment cost for new and existing conventional units
                 + (
                     self.variables.prod_existing_conv[(w, h, n)] * self.data.investor_generation_data.loc[
                         self.data.investor_generation_data["Node"] == n, "Bid price"
@@ -379,7 +377,7 @@ class Optimal_Investment:
             for h in range(1,25))
             
             for w in range(0,self.data.nb_scenarios))*(1/((1 + discount_rate) ** t))*365
-            for t in range (1,lifetime_years + 1))
+            for t in range (1,lifetime_years + 1)) #discount factor included
 
          # Add risk measure to the objective
         risk_term = self.variables.zeta - (1 / (1 - self.alpha)) * gp.quicksum(
@@ -657,76 +655,40 @@ def vary_K_and_store_results(model_instance, K_values):
     return results_df
 
 
-def plot_profit_distribution_from_results(results):
-    """
-    Plots the distribution of profits (objective values) from the results of `vary_beta_and_store_results`.
-
-    Parameters:
-    - results: List of dictionaries containing results for each beta value,
-               including "objective_value" and other information.
-    """
-    # Extract objective values from the results
-    profits = [res["objective_value"] for res in results if res["objective_value"] is not None]
-    
-    # Check if profits are available
-    if not profits:
-        print("No valid objective values found in the results.")
-        return
-    
-    # Normalize probabilities (assuming equal probability for each scenario)
-    probabilities = [1 / len(profits)] * len(profits)
-    
-    # Plot the distribution
-    plt.hist(
-        profits, bins=30, weights=probabilities, density=True, alpha=0.75, edgecolor="black"
-    )
-    
-    # Set labels and title
-    plt.xlabel("Profit (Objective Value)")
-    plt.ylabel("Density (Probability)")
-    plt.title("Profit Distribution Across Scenarios (Varying Beta)")
-    
-    # Display grid
-    plt.grid(alpha=0.3)
-    
-    # Show the plot
-    plt.show()
-
-    return None
-
-
 
 # ########## No sensitivity analysis###################
-# if __name__ == "__main__":
-#     input_data = prepare_input_data()
-#     model = Optimal_Investment(input_data=input_data, complementarity_method='SOS1')
-#     model.run()
-#     model.display_results()
+if __name__ == "__main__":
+    input_data = prepare_input_data()
+    model = Optimal_Investment(input_data=input_data, complementarity_method='SOS1')
+    model.run()
+    model.display_results()
 
 
+
+##########    Sensitivity analysis   #################################
 ##########    To vary beta    #################################
 
-if __name__ == "__main__":
-    # Prepare input data
-    input_data = prepare_input_data()
+# if __name__ == "__main__":
+#     # Prepare input data
+#     input_data = prepare_input_data()
 
-    # Instantiate the optimization model
-    model_instance = Optimal_Investment(input_data=input_data, complementarity_method='SOS1',K=2e9)
+#     # Instantiate the optimization model
+#     model_instance = Optimal_Investment(input_data=input_data, complementarity_method='SOS1',K=2e9)
 
-    # Define the range of beta values to analyze
-    beta_values = [0,0.1,0.12,0.15,0.18, 0.2, 0.3, 0.4, 0.5, 0.55,0.6, 0.7, 0.8, 0.9, 1]  
-    #beta_values = [0, 0.001, 0.003, 0.04, 0.05, 0.06, 0.07, 0.08, 0.09, 0.1,0.2]
-    # Function to vary beta and store results
-    results_df = vary_beta_and_store_results(model_instance, beta_values)
+#     # Define the range of beta values to analyze
+#     beta_values = [0,0.1,0.12,0.15,0.18, 0.2, 0.3, 0.4, 0.5, 0.55,0.6, 0.7, 0.8, 0.9, 1]  
+#     #beta_values = [0, 0.001, 0.003, 0.04, 0.05, 0.06, 0.07, 0.08, 0.09, 0.1,0.2]
+#     # Function to vary beta and store results
+#     results_df = vary_beta_and_store_results(model_instance, beta_values)
 
-    # Display the results
-    print("Results of varying beta:")
-    print(results_df)
+#     # Display the results
+#     print("Results of varying beta:")
+#     print(results_df)
     
-    plot_profit_distribution_from_results(results_df.to_dict(orient="records"))
+#     plot_profit_distribution_from_results(results_df.to_dict(orient="records"))
 
     # Optionally, save the results to a CSV file
-    results_df.to_excel("beta_results.xlsx", index=False)
+    # results_df.to_excel("beta_results.xlsx", index=False)
 
 ########    to vary K    ########################################
 
