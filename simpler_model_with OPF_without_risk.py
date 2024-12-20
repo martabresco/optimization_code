@@ -26,7 +26,7 @@ from data_simple_model import (
 )
 
 pd.set_option('display.float_format', '{:.2e}'.format) 
-discount_rate = 0.05 #Source:  ProjectedCosts ofGeneratingElectricity, IEA 2020
+discount_rate = 0.05 #Source:  Projected Costs ofGenerating Electricity, IEA 2020
 lifetime_years = 20
 nodes = list(range(0, 24))
 K = 6e9  #in dollars, max investment budget
@@ -182,17 +182,6 @@ class Optimal_Investment:
             for n in range(0, 24)
         }
 
-        # # Define electricity consumption variables for demand - removed bc now it will be fixed and exogenous
-        # self.variables.demand_consumed = {
-        #     (w, h, n): self.model.addVar(
-        #         lb=0,
-        #         ub=GRB.INFINITY,
-        #         name=f"Demand_Consumed_Scenario{w}_Hour{h}_Node{n}"
-        #     )
-        #     for w in self.data.demand_scenarios.columns
-        #     for h in range(0, 24)
-        #     for n in range(0, 24)
-        # }
 
         # Define voltage angle variables
         self.variables.voltage_angle = {
@@ -483,7 +472,6 @@ class Optimal_Investment:
 
 
     def _build_objective_function(self):
-        # Assuming 'probability_scenario' is a list of probabilities for each scenario
         probability_scenario=1/20 #probability of each lambda scenario
     
         investment_cost = gp.quicksum(
@@ -493,8 +481,6 @@ class Optimal_Investment:
             for n in range(0, 24)
         )
         
-
-    # changed the revenue calculation to get present value, discounting with discount factor 7% according to IEA. 
         production_revenue = gp.quicksum(
             365 * gp.quicksum(
                 gp.quicksum(
@@ -530,47 +516,8 @@ class Optimal_Investment:
         )
 
 
-        
-                
-               
-
-
-
-        # production_revenue = (
-        #             20 * 365 * gp.quicksum(
-        #                 gp.quicksum(
-        #                     gp.quicksum(
-        #                         probability_scenario *
-        #                         DA_prices[w, n, h] * (  # Adjust h for 0-indexed DA_prices
-        #                             self.variables.prod_new_conv_unit[(w, h, n)] +
-        #                             (
-        #                                 self.variables.prod_existing_conv[(w, h, n)]
-        #                                 if n+1 in self.data.investor_generation_data["Node"].values
-        #                                 else 0  # Skip if there is no existing generator at node n
-        #                             ) +
-        #                             self.variables.prod_PV[(w, h, n)] +
-        #                             self.variables.prod_wind[(w, h, n)]
-        #                         )
-        #                         - (
-        #                             self.variables.prod_new_conv_unit[(w, h, n)] * cand_Conv_cost  # Investment cost
-        #                             + (
-        #                                 self.variables.prod_existing_conv[(w, h, n)] *
-        #                                 self.data.investor_generation_data.loc[
-        #                                     self.data.investor_generation_data["Node"] == n+1, "Bid price"
-        #                                 ].values[0]
-        #                                 if n+1 in self.data.investor_generation_data["Node"].values
-        #                                 else 0  # Skip cost if there is no existing generator at node n
-        #                             )
-        #                         )
-        #                         for w in range(0, self.data.nb_scenarios)  # Iterate over all scenarios
-        #                     )
-        #                     for h in range(0, 24)  # Iterate over 24 hours
-        #                 )
-        #                 for n in range(0, 24)  # Iterate over all nodes
-        #             )
-        #         )
     
-        # Set the objective as the minimization of total cost
+        # Set the objective as the maximization of revenue - cost
         obj=production_revenue-investment_cost
         self.model.setObjective(obj, GRB.MAXIMIZE)
 
@@ -597,6 +544,7 @@ class Optimal_Investment:
             for (w, h, n) in self.variables.prod_new_conv_unit.keys()
         }
     
+    #Results for the case of investment allowed in only 1 node
         
     def display_results(self):
         print("\n-------------------   RESULTS  -------------------")
@@ -621,17 +569,8 @@ class Optimal_Investment:
                 
                 
         
-                
-                
-        #Rival
-        # print("\nIRival Decisions:")
-        # for n in range(0, 24):  # Assuming 24 nodes
-        #     print(f"Node {n}:")
-        #     if self.variables.prod_new_conv_rival[1,12,n].x > 0:
-        #         print(f"  - Conventional Capacity new rival: {self.variables.prod_new_conv_rival[1,12,n].x:.2f} MW")
-        #     if self.variables.prod_existing_rival[1,12,n].x > 0:
-        #         print(f"  - Conventional Capacity existing rival: {self.variables.prod_existing_rival[1,12,n].x:.2f} MW")
-        
+######### auxiliary prints of decisions, revenue, costs and profits
+
         rival_existing_decision = np.zeros((20,24, 24))
         inv_existing_decision = np.zeros((20,24, 24))
         flow_result = np.zeros((20,24, 24))
@@ -657,13 +596,7 @@ class Optimal_Investment:
                     inv_new_prod_PV[w,h,n]=self.variables.prod_PV[(w,h,n)].x
                     inv_new_prod_wind[w,h,n]=self.variables.prod_wind[(w,h,n)].x
                     inv_new_prod_conv[w,h,n]=self.variables.prod_new_conv_unit[(w,h,n)].x
-                    
-         
-        print("xxxxxxxxxxx",self.data.investment_data.loc[self.data.investment_data["Technology"] == "Conventional", "Inv_Cost"].values[0])
-
-
-        
-        
+ 
         probability_scenario=1/20
         production_revenue = gp.quicksum(
             365 * gp.quicksum(
@@ -698,7 +631,7 @@ class Optimal_Investment:
             * (1 / ((1 + discount_rate) ** t))  # Discount factor for year t
             for t in range(1, lifetime_years + 1)  # Iterate over the lifetime in years
         )
-       # print(f"revenue:, {production_revenue:.2e}")
+
         
         
         probability_scenario=1/20
@@ -724,7 +657,7 @@ class Optimal_Investment:
             * (1 / ((1 + discount_rate) ** t))  # Discount factor for year t
             for t in range(1, lifetime_years + 1)  # Iterate over the lifetime in years
         )
-        #print(f"profit:, {profit:.2e}")
+
 
 
 
@@ -751,11 +684,12 @@ class Optimal_Investment:
             * (1 / ((1 + discount_rate) ** t))  # Discount factor for year t
             for t in range(1, lifetime_years + 1)  # Iterate over the lifetime in years
         )
-        #print(f"production_cost:, {production_cost:.2e}")
 
         obj=production_revenue-production_cost
         profit_value = obj.getValue()
         print(f"profit: {profit_value:.2e}")
+        print(f"Revenue: {production_revenue:.2e}")
+        print(f"Costs: {production_cost:.2e}")
 
 
 
@@ -763,54 +697,8 @@ class Optimal_Investment:
                     
         return rival_existing_decision, inv_existing_decision,flow_result,  inv_new_prod_conv,  inv_new_prod_wind,  inv_new_prod_PV, voltage_angle
         
-        
-        
-        
-        
-        
-        # # Production Results
-        # print("\nProduction Results:")
-        # print("New Conventional Production:")
-        # for (w, h, n), var in self.variables.prod_new_conv_unit.items():
-        #     if var.x > 0:
-        #         print(f"Scenario {w}, Hour {h}, Node {n}: {var.x:.2f} MW")
-        
-        # print("\nPV Production:")
-        # for (w, h, n), var in self.variables.prod_PV.items():
-        #     if var.x > 0:
-        #         print(f"Scenario {w}, Hour {h}, Node {n}: {var.x:.2f} MW")
-        
-        # print("\nWind Production:")
-        # for (w, h, n), var in self.variables.prod_wind.items():
-        #     if var.x > 0:
-        #         print(f"Scenario {w}, Hour {h}, Node {n}: {var.x:.2f} MW")
-        
-        # print("\nExisting Conventional Production:")
-        # for (w, h, n, u), var in self.variables.prod_existing_conv.items():
-        #     if var.x > 0:
-        #         print(f"Scenario {w}, Hour {h}, Node {n}, Unit {u}: {var.x:.2f} MW")
-        
-        # print("\nExisting Rival Production:")
-        # for (w, h, n, u), var in self.variables.prod_existing_rival.items():
-        #     if var.x > 0:
-        #         print(f"Scenario {w}, Hour {h}, Node {n}, Unit {u}: {var.x:.2f} MW")
-        
-        # print("\nNew Rival Conventional Production:")
-        # for (w, h, n), var in self.variables.prod_new_conv_rival.items():
-        #     if var.x > 0:
-        #         print(f"Scenario {w}, Hour {h}, Node {n}: {var.x:.2f} MW")
-        
-        # # Demand Served
-        # print("\nDemand Served:")
-        # for (w, h, n), var in self.variables.demand_consumed.items():
-        #     if var.x > 0:
-        #         print(f"Scenario {w}, Hour {h}, Node {n}: {var.x:.2f} MW")
-        
-        # # Voltage Angles
-        # print("\nVoltage Angles:")
-        # for (w, h, n), var in self.variables.voltage_angle.items():
-        #     print(f"Scenario {w}, Hour {h}, Node {n}: Voltage Angle = {var.x:.4f} radians")
 
+######## Functions for sensitivity analysis ############
 
     
 def vary_K_and_store_results(model_instance, K_values):
@@ -976,9 +864,9 @@ if __name__ == "__main__":
     model.run()
     rival_existing_decision, inv_existing_decision, flow_result,  inv_new_prod_conv,  inv_new_prod_wind,  inv_new_prod_PV, voltage_angle=model.display_results()
 
+###########Sensitivity analysis ###########
 
-
-#     # Define the range of K values to analyze
+# Define the range of K values to analyze
     # K_values = [1e5,1.5e5, 1e6,1.5e6, 1e7,1.5e7,1e8, 2e8,3e8,4e8,5e8,6e8,7e8,8e8,9e8,1e9,1.2e9,1.4e9,1.6e9,1.8e9,2e9,3e9,4e9,5e9,6e9]  # Example K values in dollars
 
     # # Vary K and store results
@@ -992,17 +880,17 @@ if __name__ == "__main__":
     # results_df.to_excel("K_results.xlsx", index=False)
 
  # Define the range of N values to analyze
-    N_values =range(0,24)
+    # N_values =range(0,24)
 
     # Vary N and store results
-    results_df2 = vary_Nodes_and_store_results(model, N_values)
+    # results_df2 = vary_Nodes_and_store_results(model, N_values)
 
-    # Display the results
-    print("Results of varying N:")
-    print(results_df2)
+    # # Display the results
+    # print("Results of varying N:")
+    # print(results_df2)
 
     # Optionally, save the results to a CSV file
-    results_df2.to_excel("N_results.xlsx", index=False)
+    # results_df2.to_excel("N_results.xlsx", index=False)
 
 
     

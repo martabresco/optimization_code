@@ -152,7 +152,7 @@ Omega_n_sets = {
     24: [3,15],
 }
 
-# Matrices
+#Matrices
 susceptance_matrix = create_susceptance_matrix(data=[
     (0, 'L1', 1, 2, 0.0146, 175),
     (1, 'L2', 1, 3, 0.2253, 175),
