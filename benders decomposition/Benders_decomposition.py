@@ -33,7 +33,7 @@ BENDERS_TYPES = ['unit-cut','multi-cut'] # types of benders algorithm
 # Set values of input parameters
 invested_node=18
 max_Investment_cap=250
-Budget= 4.00e8
+Budget= 2.00e8
 discount_rate=0.05
 lifetime_years=20
 
@@ -269,10 +269,10 @@ class benders_master: # class of master problem
 
         #Set the objective function for the master problem
         if self.data.benders_type == 'uni-cut':
-            master_objective = investment_data.iloc[2,1]*self.variables.inv_cap_PV + self.variables.gamma # expected electricity production cost (z)
+            master_objective = investment_data.iloc[1,1]*self.variables.inv_cap_PV + self.variables.gamma # expected electricity production cost (z)
             
         if self.data.benders_type == 'multi-cut':
-            master_objective = investment_data.iloc[2,1]*self.variables.inv_cap_PV + gb.quicksum(probability_scenario[s]*self.variables.gamma[s] for s in SCENARIOS) # expected electricity production cost (z)   
+            master_objective = investment_data.iloc[1,1]*self.variables.inv_cap_PV + gb.quicksum(probability_scenario[s]*self.variables.gamma[s] for s in SCENARIOS) # expected electricity production cost (z)   
         m.setObjective(master_objective, gb.GRB.MINIMIZE) #minimize cost
 
             
@@ -287,7 +287,7 @@ class benders_master: # class of master problem
             
         # add constraints related to complicating constraints
         self.constraints.max_budget_constraint = m.addConstr(
-                investment_data.iloc[2,1]*self.variables.inv_cap_PV,
+                investment_data.iloc[1,1]*self.variables.inv_cap_PV,
                 gb.GRB.LESS_EQUAL,
                 Budget,name='maximum investment') # day-ahead balance equation
 

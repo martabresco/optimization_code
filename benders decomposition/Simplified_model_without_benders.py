@@ -17,7 +17,7 @@ probability_scenario = [0.05] * 20
 
 invested_node = 18
 max_investment_cap = 250
-budget = 4.00e8
+budget = 2.00e8
 discount_rate = 0.05
 lifetime_years = 20
 
@@ -71,7 +71,7 @@ model.setObjective(objective, gb.GRB.MINIMIZE)
 model.addConstr(xP <= max_investment_cap, name="Max_Investment_Capacity")
 
 # Budget constraint
-model.addConstr(investment_data.iloc[2, 1] * xP <= budget, name="Budget_Constraint")
+model.addConstr(investment_data.iloc[1, 1] * xP <= budget, name="Budget_Constraint")
 
 # PV production constraint
 model.addConstrs(
@@ -161,7 +161,7 @@ else:
 #         model.addConstr(xP <= max_investment_cap, name="Max_Investment_Capacity")
 
 #         # Budget constraint
-#         model.addConstr(investment_data.iloc[2, 1] * xP <= Budget, name="Budget_Constraint")
+#         model.addConstr(investment_data.iloc[1, 1] * xP <= Budget, name="Budget_Constraint")
 
 #         # PV production constraint
 #         model.addConstrs(
@@ -215,5 +215,6 @@ else:
 
 # # Save the DataFrame to an Excel file
 # results_df.to_excel("results_without_decomposition.xlsx", index=False)
+
 
 
