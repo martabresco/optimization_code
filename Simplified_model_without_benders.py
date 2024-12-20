@@ -27,7 +27,7 @@ generation_capacity = investor_generation_data_d["Pmax [MW]"]
 PF_PV = pv_PF.iloc[:, 1]
 
 
-############ Solve and print results without budget analysis ##############
+############ Solve and print results with fixed budget ##############
 
 
 # Model
